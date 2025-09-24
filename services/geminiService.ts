@@ -24,16 +24,24 @@ export const getGeminiFlavorText = async (concept: string): Promise<string> => {
       },
     });
 
-    // Extract the text directly from the response's .text property.
-    const flavorText = response.text.trim();
+    // Safely access the text property to prevent runtime errors.
+    const flavorText = response.text;
+    
+    if (!flavorText) {
+      console.warn(`Gemini API returned no text for concept "${concept}". This might be due to content filtering.`, response);
+      // Provide a graceful fallback.
+      return '"The universal archives on this topic are mysteriously empty."';
+    }
+
+    const trimmedText = flavorText.trim();
     
     // A simple check to ensure the output is in the desired format (starts and ends with a quote).
-    if (flavorText.startsWith('"') && flavorText.endsWith('"')) {
-        return flavorText;
+    if (trimmedText.startsWith('"') && trimmedText.endsWith('"')) {
+        return trimmedText;
     }
 
     // Fallback if the model doesn't follow instructions perfectly.
-    return `"${flavorText}"`;
+    return `"${trimmedText}"`;
 
   } catch (error) {
     console.error(`Error fetching flavor text for "${concept}":`, error);
@@ -58,8 +66,15 @@ export const getGeminiLoreForNode = async (node: GameNode, chapter: Chapter): Pr
                 maxOutputTokens: 80,
             }
         });
+        
+        const loreText = response.text;
+        if (!loreText) {
+            console.warn(`Gemini API returned no lore for node "${node.label}".`, response);
+            return "The connection is weak... The future is clouded.";
+        }
 
-        return response.text.trim();
+        return loreText.trim();
+
     } catch (error) {
         console.error(`Error fetching lore for "${node.label}":`, error);
         return "The connection is weak... The future is clouded.";

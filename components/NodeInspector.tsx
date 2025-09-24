@@ -33,7 +33,7 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ node, chapter, onClose })
 
     return (
         <div 
-            className="absolute top-1/2 right-4 -translate-y-1/2 bg-gray-900/80 backdrop-blur-sm border border-teal-500 rounded-lg p-4 w-80 z-20"
+            className="absolute top-1/2 right-4 -translate-y-1/2 bg-gray-900/80 backdrop-blur-sm border border-teal-500 rounded-lg p-4 w-80 z-20 pointer-events-auto"
             onClick={e => e.stopPropagation()} // Prevent clicks inside from closing the panel
         >
             <div className="flex justify-between items-center mb-3">

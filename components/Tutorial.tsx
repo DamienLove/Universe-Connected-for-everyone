@@ -5,10 +5,9 @@ import { TUTORIAL_STEPS } from '../constants';
 interface TutorialProps {
   step: number;
   dispatch: React.Dispatch<GameAction>;
-  activeMilestone: string | null;
 }
 
-const Tutorial: React.FC<TutorialProps> = ({ step, dispatch, activeMilestone }) => {
+const Tutorial: React.FC<TutorialProps> = ({ step, dispatch }) => {
   const [highlightStyle, setHighlightStyle] = useState<React.CSSProperties>({});
   const currentStep = TUTORIAL_STEPS[step];
 
@@ -34,12 +33,8 @@ const Tutorial: React.FC<TutorialProps> = ({ step, dispatch, activeMilestone }) 
       }
     };
     
-    // Initial update
     updateHighlight();
-    
-    // Update on interval in case of layout shifts or modal animations
     const interval = setInterval(updateHighlight, 100);
-
     return () => clearInterval(interval);
 
   }, [currentStep]);
@@ -50,15 +45,18 @@ const Tutorial: React.FC<TutorialProps> = ({ step, dispatch, activeMilestone }) 
     dispatch({ type: 'ADVANCE_TUTORIAL' });
   };
   
-  // Only show the 'Next' button for passive, observational tutorial steps.
-  // Steps 0 and 1 require specific user actions to advance.
-  // Also, hide the button if a milestone animation is playing.
-  const showNextButton = step > 1 && !activeMilestone;
+  const handleClose = () => {
+    dispatch({ type: 'ADVANCE_TUTORIAL', payload: { forceEnd: true } });
+  }
+  
+  // FIX: Simplified logic now that the parent component hides the tutorial during milestones.
+  const showNextButton = step > 1;
 
   return (
     <>
       <div className="tutorial-highlight" style={highlightStyle} />
       <div className="tutorial-box">
+        <button onClick={handleClose} className="absolute top-2 right-3 text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
         <p className="text-lg text-gray-200" dangerouslySetInnerHTML={{ __html: currentStep.text }} />
         {showNextButton && (
           <div className="flex justify-end mt-4">

@@ -19,7 +19,8 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, gameState,
       (upgrade.cost.energy === undefined || gameState.energy >= upgrade.cost.energy) &&
       (upgrade.cost.knowledge === undefined || gameState.knowledge >= upgrade.cost.knowledge) &&
       (upgrade.cost.unity === undefined || gameState.unity >= upgrade.cost.unity) &&
-      (upgrade.cost.complexity === undefined || gameState.complexity >= upgrade.cost.complexity);
+      (upgrade.cost.complexity === undefined || gameState.complexity >= upgrade.cost.complexity) &&
+      (upgrade.cost.data === undefined || gameState.data >= upgrade.cost.data);
       
     const meetsKarmaReq = upgrade.karmaRequirement ? upgrade.karmaRequirement(gameState.karma) : true;
     

@@ -17,6 +17,7 @@ const urlsToCache = [
   '/components/Simulation.tsx',
   '/components/Tutorial.tsx',
   '/components/MilestoneVisual.tsx',
+  '/components/BackgroundEffects.tsx',
 ];
 
 self.addEventListener('install', (event) => {

@@ -1,380 +1,269 @@
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
-  }
-}
-</script>
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Universe Connected for Everyone: The Game</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0a0a0a" />
-    <style>
-      body {
-        background-color: #000; /* Darker background for deep space */
-        color: #e0e0e0;
-        overflow: hidden;
-        font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-      }
-      #root {
-        width: 100vw;
-        height: 100vh;
-        position: relative;
-        background: #000;
-      }
-      .glow-text {
-        text-shadow: 0 0 5px rgba(255, 255, 255, 0.3), 0 0 10px rgba(100, 180, 255, 0.3);
-      }
-      .karma-good {
-        text-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
-      }
-      .karma-bad {
-        text-shadow: 0 0 8px rgba(248, 113, 113, 0.8);
-      }
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universe Connected: The Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    /* Basic setup */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      background-color: #000;
+      color: #fff;
+    }
+    
+    /* Custom Glow Effect */
+    .glow-text {
+      text-shadow: 0 0 5px rgba(173, 216, 230, 0.6), 0 0 10px rgba(173, 216, 230, 0.5), 0 0 15px rgba(144, 238, 144, 0.4);
+    }
 
-      /* --- Animations --- */
-      @keyframes pulse {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.1); opacity: 0.8; }
-      }
-      @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-      @keyframes spin-reverse {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(-360deg); }
-      }
-       @keyframes solar-flare {
-        0%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
-        50% { transform: scale(1.05) rotate(2deg); filter: brightness(1.2); }
-      }
-      @keyframes star-pulse {
-        0%, 100% { opacity: 0.6; transform: scale(1.1); }
-        50% { opacity: 1; transform: scale(1.15); }
-      }
-      @keyframes life-pulse {
-        0%, 100% {
-          filter: brightness(1) saturate(1);
-        }
-        50% {
-          filter: brightness(1.1) saturate(1.2);
-        }
-      }
-       @keyframes haze-pulse {
-        0%, 100% { opacity: 0.5; transform: scale(1.05); }
-        50% { opacity: 0.8; transform: scale(1.1); }
-      }
-      @keyframes consciousness-core-pulse {
-         0%, 100% { transform: scale(0.9); opacity: 0.8; filter: drop-shadow(0 0 15px #0ff) drop-shadow(0 0 30px #0ff) brightness(1); }
-         50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 25px #0ff) drop-shadow(0 0 50px #0ff) brightness(1.2); }
-      }
-      @keyframes black-hole-suck {
-        0% { transform: scale(1) rotate(0deg); }
-        100% { transform: scale(1.02) rotate(45deg); }
-      }
-      @keyframes accretion-disk-spin {
-        from { transform: translate(-50%, -50%) rotate(0deg); }
-        to { transform: translate(-50%, -50%) rotate(360deg); }
-      }
-      @keyframes nebula-swirl {
-        0% { transform: rotate(0deg) scale(1); filter: brightness(0.9); }
-        50% { transform: rotate(1.5deg) scale(1.02); filter: brightness(1.1); }
-        100% { transform: rotate(0deg) scale(1); filter: brightness(0.9); }
-      }
-       @keyframes ai-core-pulse {
-        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px #00c6ff) drop-shadow(0 0 20px #0072ff); }
-        50% { transform: scale(1.05); filter: drop-shadow(0 0 20px #00c6ff) drop-shadow(0 0 40px #0072ff); }
-      }
+    /* Splash Screen Animations */
+    .splash-screen {
+      background: radial-gradient(ellipse at center, #0a0a1a 0%, #000000 70%);
+    }
 
-      /* --- Splash Screen --- */
-      .splash-screen .particle-neutral {
-        position: absolute; border-radius: 50%; background: rgba(200, 200, 255, 0.5);
-        width: var(--size, 2px); height: var(--size, 2px);
-        animation: drift var(--duration) var(--delay) linear infinite; top: 0; left: 0;
-      }
-      @keyframes drift {
-        from { transform: translate(var(--x-start, 50vw), var(--y-start, 50vh)); opacity: 0; }
-        50% { opacity: 0.7; }
-        to { transform: translate(var(--x-end, 50vw), var(--y-end, 50vh)); opacity: 0; }
-      }
-      @keyframes fade-in-slow { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-      .animate-fade-in-slow { animation: fade-in-slow 2.5s ease-out forwards; }
-      
-      /* --- Starfield Background --- */
-      .simulation-container {
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
-        background: 
-          radial-gradient(ellipse at 20% 80%, rgba(49, 46, 129, 0.2), transparent 50%),
-          radial-gradient(ellipse at 75% 30%, rgba(107, 33, 168, 0.15), transparent 60%),
-          radial-gradient(ellipse at center, rgba(31, 41, 55, 0.3) 0%, rgba(0,0,0,0) 70%), 
-          #000;
-        overflow: hidden;
-      }
-      .stars {
-        background-image:
-          radial-gradient(1px 1px at 25px 25px, white, transparent),
-          radial-gradient(1px 1px at 75px 75px, white, transparent),
-          radial-gradient(2px 2px at 125px 125px, white, transparent);
-        background-repeat: repeat;
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-      }
-      .stars1 { background-size: 200px 200px; animation: spin 180s linear infinite; }
-      .stars2 { background-size: 300px 300px; animation: spin-reverse 240s linear infinite; opacity: 0.7; }
-      .stars3 { background-size: 500px 500px; animation: spin 360s linear infinite; opacity: 0.5; }
+    @keyframes fadeInSlow {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
 
-      /* --- New DOM-based Node Styles --- */
-      .world-container {
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        transform-style: preserve-3d;
+    .animate-fade-in-slow {
+      animation: fadeInSlow 3s ease-out forwards;
+    }
+    
+    /* Particle animations for splash and background */
+    .particle-container {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      width: var(--size);
+      height: var(--size);
+      animation: move var(--duration) var(--delay) linear infinite;
+    }
+
+    .particle-neutral { background-color: rgba(200, 200, 255, 0.3); }
+
+    @keyframes move {
+      from {
+        transform: translate(var(--x-start), var(--y-start));
+        opacity: 0.8;
       }
-      .connections-svg {
+      to {
+        transform: translate(var(--x-end), var(--y-end));
+        opacity: 0;
+      }
+    }
+
+    /* Simulation View */
+    .simulation-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    .simulation-container:active { cursor: grabbing; }
+    
+    .world-container {
+      position: absolute;
+      will-change: transform;
+    }
+
+    .connections-svg {
         position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
+        top: 0;
+        left: 0;
+        width: 1px;
+        height: 1px;
         overflow: visible;
         pointer-events: none;
-      }
-      .node-image-container {
-        position: absolute;
-        transform: translate(-50%, -50%); /* Center the node */
-        pointer-events: auto;
-        cursor: pointer;
-      }
-      .node-image, .node-placeholder {
-        width: 100%; height: 100%;
-        background-size: contain;
-        background-position: center;
-        background-repeat: no-repeat;
+    }
+    
+    .node-image-container {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* Adjust for centering */
+      margin-left: -50%;
+      margin-top: -50%;
+    }
+    
+    .node-image {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-size: cover;
+      background-position: center;
+      animation: spin 60s linear infinite;
+    }
+    
+    .node-image.star {
+      box-shadow: 0 0 20px #ffcc00, 0 0 40px #ffaa00, inset 0 0 10px #ffffff;
+      animation: pulse 4s ease-in-out infinite, spin 60s linear infinite;
+    }
+    .node-image.hasLife {
+      box-shadow: 0 0 15px #00ffcc, 0 0 30px #00ccff;
+    }
+    .node-placeholder {
+        width: 100%;
+        height: 100%;
         border-radius: 50%;
-        transition: transform 0.1s ease-out;
-      }
-      .node-placeholder {
-         background-color: rgba(100, 100, 150, 0.2);
-         border: 1px dashed rgba(150, 150, 200, 0.5);
-         animation: pulse 2s infinite;
-      }
-      
-      .node-image.star { animation: solar-flare 6s infinite ease-in-out; }
-      .node-image.star::before { /* Corona */
+        background: radial-gradient(circle, #555, #222);
+    }
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+    /* Tutorial Highlighter */
+    .tutorial-highlight {
+      position: fixed;
+      border: 3px solid #00f6ff;
+      border-radius: 8px;
+      box-shadow: 0 0 15px #00f6ff;
+      transition: all 0.3s ease-in-out;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .tutorial-box {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(17, 24, 39, 0.9);
+      border: 1px solid #4f46e5;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 500px;
+      z-index: 101;
+      box-shadow: 0 0 20px rgba(79, 70, 229, 0.5);
+    }
+    
+    /* Milestone Visuals */
+    .milestone-container {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      animation: fadeInMilestone 1s ease-out, fadeOutMilestone 1s 5s ease-in forwards;
+      pointer-events: none;
+    }
+    .milestone-scene {
+      width: 100%; height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    .milestone-title {
+      position: absolute;
+      bottom: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 2.5rem;
+      text-align: center;
+      color: white;
+      text-shadow: 0 0 10px black, 0 0 20px black;
+      z-index: 10;
+    }
+
+    @keyframes fadeInMilestone { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOutMilestone { from { opacity: 1; } to { opacity: 0; } }
+    
+    /* Spark of Life specific */
+    .deep-sea-bg {
+      background: linear-gradient(to top, #020412, #0a143a, #1a3a6e);
+    }
+    .vent-plume {
+      position: absolute;
+      bottom: -100px;
+      width: 20px;
+      height: 120%;
+      background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(20,20,30,0.4), transparent);
+      filter: blur(15px);
+      transform: skewX(-10deg);
+      animation: plume-sway 10s ease-in-out infinite alternate;
+    }
+    @keyframes plume-sway {
+      from { transform: skewX(-15deg) scaleY(1); }
+      to { transform: skewX(15deg) scaleY(1.05); }
+    }
+    .bubble {
+      position: absolute;
+      bottom: -20px;
+      background-color: rgba(150, 200, 255, 0.2);
+      border-radius: 50%;
+      animation-name: rise;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+    @keyframes rise {
+      0% { transform: translateY(0) translateX(0); }
+      100% { transform: translateY(-120vh) translateX(var(--sway)); }
+    }
+
+    /* Panspermia specific */
+    .starfield { background: #000; }
+    .comet {
+        position: absolute;
+        left: -10%;
+        width: 3px; height: 3px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 0 10px 2px #fff, 0 0 20px 4px #0ff;
+        animation: shoot 3s linear infinite;
+    }
+    .comet::before {
         content: '';
-        position: absolute; inset: -30%; border-radius: 50%;
-        background: radial-gradient(ellipse at center, rgba(255,239,128,0.5) 0%, transparent 70%);
-        animation: star-pulse 3s infinite ease-in-out;
-      }
-      
-      .node-image.planet { animation: spin-reverse 120s linear infinite; }
-      .node-image.planet::after { /* Atmosphere */
-        content: '';
-        position: absolute; inset: -10%; border-radius: 50%;
-        background: radial-gradient(circle, transparent 70%, rgba(135, 206, 235, 0.2) 100%);
-        animation: haze-pulse 5s infinite ease-in-out;
-      }
-      .node-image.planet.hasLife {
-        animation-name: life-pulse, spin-reverse;
-        animation-duration: 3s, 120s;
-        animation-iteration-count: infinite, infinite;
-        animation-timing-function: ease-in-out, linear;
-      }
-      .node-image.planet.hasLife::after {
-         background: radial-gradient(circle, transparent 70%, rgba(74, 222, 128, 0.3) 100%);
-      }
-      
-      .node-image-container .proto_creature {
-        background: #c0f; box-shadow: 0 0 5px #c0f, 0 0 8px #f0c;
-        border-radius: 50%;
-      }
-      
-      .node-image.nebula { animation: nebula-swirl 25s infinite linear; }
-      
-      .node-image.consciousness { animation: consciousness-core-pulse 2s infinite ease-in-out; }
-      
-      .node-image.black_hole { animation: black-hole-suck 5s infinite linear; }
-      .node-image.black_hole::before { /* Accretion Disk - using a separate animated image would be better, but for now CSS */
-        content: ''; position: absolute;
-        top: 50%; left: 50%; width: 250%; height: 250%;
-        border: 3px solid transparent;
-        border-top-color: #f0f;
-        border-right-color: #f0f;
-        border-radius: 50%;
-        animation: accretion-disk-spin 3s linear infinite;
-      }
-      
-      .node-image.sentient_ai { animation: ai-core-pulse 2s infinite ease-in-out; }
-
-
-      /* --- UI & Overlays --- */
-      .ui-container {
-        position: absolute; inset: 0; padding: 1rem;
-        display: flex; flex-direction: column; justify-content: space-between;
-        pointer-events: none; z-index: 10;
-      }
-      .top-bar, .bottom-bar {
-        width: 100%; display: flex; align-items: center; gap: 1rem;
-        pointer-events: auto;
-      }
-      .top-bar {
-        justify-content: flex-end; background: rgba(0,0,0,0.3); padding: 0.5rem 1rem;
-        border-radius: 8px; flex-wrap: wrap;
-      }
-      .bottom-bar { justify-content: space-between; }
-      .resource {
-        background: rgba(20, 20, 20, 0.7); padding: 0.25rem 0.75rem;
-        border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem;
-      }
-      .resource span { font-weight: bold; color: #f59e0b; }
-      .era-display {
-        background: rgba(0,0,0,0.5); padding: 0.5rem 1rem;
-        border-radius: 8px; border: 1px solid rgba(168, 85, 247, 0.4);
-      }
-      .progress-bar {
-        width: 200px; height: 8px; background: rgba(255,255,255,0.1);
-        border-radius: 4px; margin-top: 4px; overflow: hidden;
-      }
-      .progress-bar-fill {
-        height: 100%; background: linear-gradient(90deg, #a855f7, #6366f1);
-        border-radius: 4px; transition: width 0.5s ease-in-out;
-      }
-      .knowledge-web-button {
-        padding: 0.75rem 1.5rem; background-color: rgba(126, 34, 206, 0.6);
-        border: 1px solid #a855f7; border-radius: 8px;
-        font-size: 1.1rem; font-weight: bold; cursor: pointer;
-        transition: all 0.2s ease-in-out;
-      }
-      .knowledge-web-button:hover {
-        background-color: rgba(147, 51, 234, 0.7);
-        box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
-      }
-      
-      /* Milestone Visualizer Styles */
-      .milestone-container {
-        position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100;
-        display: flex; align-items: center; justify-content: center;
-        animation: fadeIn 1s ease-out, fadeOut 1s 5s ease-in forwards;
-      }
-      .milestone-scene { width: 100%; height: 100%; position: relative; overflow: hidden; }
-      .milestone-title {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        font-size: 2.5rem; color: white; text-shadow: 0 0 15px #fff;
-        text-align: center; z-index: 10; animation: textFadeInUp 3s both;
-      }
-
-      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-      @keyframes textFadeInUp { from { opacity: 0; transform: translate(-50%, -30%); } to { opacity: 1; transform: translate(-50%, -50%); } }
-      
-      .starfield { background: #000 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="10" cy="10" r="1" fill="white"/><circle cx="50" cy="80" r="0.5" fill="white"/><circle cx="80" cy="30" r="1" fill="white"/></svg>'); }
-      .comet {
-        position: absolute; width: 2px; height: 2px; background: #fff;
-        border-radius: 50%; box-shadow: 0 0 10px #fff, 0 0 20px #0ff; animation: shoot 3s ease-in forwards;
-      }
-      .comet::before {
-        content: ''; position: absolute; top: 50%; transform: translateY(-50%);
-        width: 200px; height: 1px; background: linear-gradient(90deg, #fff, transparent);
-      }
-      .impact-flash {
-          position: absolute; width: 100px; height: 100px; background: white;
-          border-radius: 50%; animation: flash 1s 2.5s both;
-      }
-      @keyframes shoot { from { transform: translate(100vw, -100px) scale(1); } 80% { transform: translate(10vw, calc(50% + 5vh)) scale(1); } 100% { transform: translate(10vw, calc(50% + 5vh)) scale(3); } }
-      @keyframes flash { from { transform: scale(0); opacity: 1; } to { transform: scale(2); opacity: 0; } }
-
-      .earthy { background: radial-gradient(circle, #3a2d0f, #1a1405); }
-      .network-line {
-          position: absolute; width: 2px; height: 150vh; top: -25vh; left: 50%;
-          background: linear-gradient(0deg, transparent, #7c3aed, transparent); animation: growLine 2s ease-out forwards;
-      }
-      @keyframes growLine { from { height: 0; top: 50%; } to { height: 150vh; top: -25vh; } }
-      
-      /* New: Hydrothermal Vent Milestone */
-      .deep-sea-bg {
-        background: radial-gradient(ellipse at center, #020a1f, #000);
-        filter: blur(2px);
-      }
-      .vent-plume {
         position: absolute;
-        bottom: 0;
-        width: 50px;
-        height: 120%;
-        background: linear-gradient(to top, rgba(20, 20, 30, 0.8), transparent);
-        filter: blur(20px);
-        animation: vent-plume 10s ease-in-out infinite alternate;
-      }
-      @keyframes vent-plume {
-        from { transform: scale(1) skewX(-5deg); }
-        to { transform: scale(1.1) skewX(5deg); }
-      }
-      .bubble {
-        position: absolute;
-        bottom: -20px;
-        border-radius: 50%;
-        background: rgba(150, 180, 255, 0.2);
-        border: 1px solid rgba(200, 220, 255, 0.3);
-        animation-name: bubble-rise;
-        animation-timing-function: linear;
-        animation-iteration-count: infinite;
-      }
-      @keyframes bubble-rise {
-        from { transform: translateY(0) translateX(0); opacity: 1; }
-        to { transform: translateY(-105vh) translateX(var(--sway)); opacity: 0; }
-      }
+        width: 150px; height: 2px;
+        background: linear-gradient(to left, transparent, #fff);
+        transform: translateY(-50%) rotate(-30deg);
+        transform-origin: right;
+    }
+    @keyframes shoot {
+        from { transform: translate(0, 0); }
+        to { transform: translate(120vw, 40vh); }
+    }
 
-      /* Karma Particles */
-      .particle-container { position: fixed; inset: 0; pointer-events: none; z-index: -1; }
-      .particle { position: absolute; border-radius: 50%; }
-      .particle-harmony { background: rgba(74, 222, 128, 0.6); animation-name: driftUp; }
-      .particle-chaos { background: rgba(220, 38, 38, 0.5); animation-name: chaoticMove; }
-      .particle-neutral { background: rgba(107, 114, 128, 0.4); animation-name: driftUp; }
-      @keyframes driftUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-100vh); opacity: 0; } }
-      @keyframes chaoticMove { 0% { transform: translate(0, 0); } 100% { transform: translate(calc(var(--i) * 100vw), calc(var(--j) * 100vh)); opacity: 0; } }
-      
-      /* Tutorial Styles */
-      .tutorial-box {
-          position: fixed;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          max-width: 500px;
-          background: rgba(10, 10, 20, 0.9);
-          border: 1px solid #4f46e5;
-          border-radius: 8px;
-          padding: 1.5rem;
-          box-shadow: 0 0 20px rgba(79, 70, 229, 0.5);
-          z-index: 101;
-          pointer-events: auto;
-      }
-      .tutorial-highlight {
-          position: fixed; border: 3px solid #14b8a6; border-radius: 8px;
-          box-shadow: 0 0 15px #14b8a6; z-index: 100;
-          pointer-events: none; transition: all 0.3s ease-in-out;
-      }
-    </style>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js').then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          }, err => {
-            console.log('ServiceWorker registration failed: ', err);
-          });
-        });
-      }
-    </script>
-  </body>
+    /* Mycorrhizal Networks specific */
+    .earthy {
+      background: radial-gradient(ellipse at bottom, #4a2e1a, #1a0e05);
+    }
+    .network-line {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 2px;
+      height: 200%;
+      background: linear-gradient(to bottom, transparent, #9f7aea, transparent);
+      opacity: 0.6;
+      animation: grow 4s ease-out forwards;
+    }
+    @keyframes grow {
+        from { transform: scaleY(0) rotate(var(--angle, 0deg)); opacity: 0; }
+        to { transform: scaleY(1) rotate(var(--angle, 0deg)); opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://aistudiocdn.com/react@^19.1.1",
+      "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+      "react/": "https://aistudiocdn.com/react@^19.1.1/",
+      "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0"
+    }
+  }
+  </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

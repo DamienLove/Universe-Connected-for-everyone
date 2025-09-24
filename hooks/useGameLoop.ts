@@ -2,11 +2,20 @@ import React from 'react';
 import { GameAction } from '../types';
 
 export const useGameLoop = (dispatch: React.Dispatch<GameAction>, dimensions: { width: number; height: number }) => {
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      dispatch({ type: 'TICK', payload: { width: dimensions.width, height: dimensions.height } });
-    }, 30); // Game ticks every 30ms for smoother, faster animation
+  // FIX: Initialize useRef with null to provide an argument and fix the compile error.
+  const animationFrameId = React.useRef<number | null>(null);
 
-    return () => clearInterval(interval);
+  const loop = React.useCallback(() => {
+    dispatch({ type: 'TICK', payload: { width: dimensions.width, height: dimensions.height } });
+    animationFrameId.current = requestAnimationFrame(loop);
   }, [dispatch, dimensions.width, dimensions.height]);
+
+  React.useEffect(() => {
+    animationFrameId.current = requestAnimationFrame(loop);
+    return () => {
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
+    };
+  }, [loop]);
 };

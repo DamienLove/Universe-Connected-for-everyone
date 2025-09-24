@@ -203,7 +203,7 @@ function App() {
   return (
     <div className="App">
         <KarmaParticles karma={state.karma} />
-        <Simulation nodes={state.nodes} dimensions={dimensions} />
+        <Simulation nodes={state.nodes} dimensions={dimensions} tick={state.tick} />
       
         {state.activeMilestone && (
             <MilestoneVisual 

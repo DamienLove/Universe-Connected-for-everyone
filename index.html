@@ -54,21 +54,19 @@
         to { transform: rotate(-360deg); }
       }
        @keyframes solar-flare {
-        0%, 100% { transform: scale(1); box-shadow: 0 0 25px #fff, 0 0 45px #ff0, 0 0 70px #f80; }
-        50% { transform: scale(1.05); box-shadow: 0 0 40px #fff, 0 0 70px #ff0, 0 0 110px #f80; }
+        0%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+        50% { transform: scale(1.05) rotate(2deg); filter: brightness(1.2); }
       }
       @keyframes star-pulse {
-        0%, 100% { opacity: 0.6; }
-        50% { opacity: 1; }
+        0%, 100% { opacity: 0.6; transform: scale(1.1); }
+        50% { opacity: 1; transform: scale(1.15); }
       }
       @keyframes life-pulse {
         0%, 100% {
-          transform: scale(1);
-          box-shadow: 0 0 8px rgba(34, 197, 94, 0.5), 0 0 12px rgba(34, 197, 94, 0.3), inset 0 0 10px rgba(134, 239, 172, 0.3);
+          filter: brightness(1) saturate(1);
         }
         50% {
-          transform: scale(1.05);
-          box-shadow: 0 0 12px rgba(34, 197, 94, 0.7), 0 0 18px rgba(34, 197, 94, 0.5), inset 0 0 12px rgba(134, 239, 172, 0.4);
+          filter: brightness(1.1) saturate(1.2);
         }
       }
        @keyframes haze-pulse {
@@ -76,25 +74,25 @@
         50% { opacity: 0.8; transform: scale(1.1); }
       }
       @keyframes consciousness-core-pulse {
-         0%, 100% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 15px #fff, 0 0 30px #0ff, 0 0 45px #0ff; }
-         50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 25px #fff, 0 0 50px #0ff, 0 0 75px #0ff; }
+         0%, 100% { transform: scale(0.9); opacity: 0.8; filter: drop-shadow(0 0 15px #0ff) drop-shadow(0 0 30px #0ff) brightness(1); }
+         50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 25px #0ff) drop-shadow(0 0 50px #0ff) brightness(1.2); }
       }
       @keyframes black-hole-suck {
         0% { transform: scale(1) rotate(0deg); }
-        100% { transform: scale(1.05) rotate(180deg); }
+        100% { transform: scale(1.02) rotate(45deg); }
       }
       @keyframes accretion-disk-spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
+        from { transform: translate(-50%, -50%) rotate(0deg); }
+        to { transform: translate(-50%, -50%) rotate(360deg); }
       }
       @keyframes nebula-swirl {
-        0% { transform: rotate(0deg) scale(1); }
-        50% { transform: rotate(1.5deg) scale(1.02); }
-        100% { transform: rotate(0deg) scale(1); }
+        0% { transform: rotate(0deg) scale(1); filter: brightness(0.9); }
+        50% { transform: rotate(1.5deg) scale(1.02); filter: brightness(1.1); }
+        100% { transform: rotate(0deg) scale(1); filter: brightness(0.9); }
       }
        @keyframes ai-core-pulse {
-        0%, 100% { opacity: 0.7; }
-        50% { opacity: 1; }
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px #00c6ff) drop-shadow(0 0 20px #0072ff); }
+        50% { transform: scale(1.05); filter: drop-shadow(0 0 20px #00c6ff) drop-shadow(0 0 40px #0072ff); }
       }
 
       /* --- Splash Screen --- */
@@ -114,7 +112,11 @@
       /* --- Starfield Background --- */
       .simulation-container {
         position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;
-        background: radial-gradient(ellipse at center, rgba(31, 41, 55, 0.3) 0%, rgba(0,0,0,0) 70%), #000;
+        background: 
+          radial-gradient(ellipse at 20% 80%, rgba(49, 46, 129, 0.2), transparent 50%),
+          radial-gradient(ellipse at 75% 30%, rgba(107, 33, 168, 0.15), transparent 60%),
+          radial-gradient(ellipse at center, rgba(31, 41, 55, 0.3) 0%, rgba(0,0,0,0) 70%), 
+          #000;
         overflow: hidden;
       }
       .stars {
@@ -130,101 +132,86 @@
       .stars2 { background-size: 300px 300px; animation: spin-reverse 240s linear infinite; opacity: 0.7; }
       .stars3 { background-size: 500px 500px; animation: spin 360s linear infinite; opacity: 0.5; }
 
-      /* --- Node Styles --- */
-      .node {
+      /* --- New DOM-based Node Styles --- */
+      .world-container {
         position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        transform-style: preserve-3d;
+      }
+      .connections-svg {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        overflow: visible;
+        pointer-events: none;
+      }
+      .node-image-container {
+        position: absolute;
+        transform: translate(-50%, -50%); /* Center the node */
+        pointer-events: auto;
+        cursor: pointer;
+      }
+      .node-image, .node-placeholder {
+        width: 100%; height: 100%;
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
         border-radius: 50%;
-        transform: translate(-50%, -50%);
         transition: transform 0.1s ease-out;
       }
-      .star {
-        background: radial-gradient(ellipse at center, #fff 0%, #ffef80 40%, #f80 100%);
-        animation: solar-flare 6s infinite ease-in-out;
+      .node-placeholder {
+         background-color: rgba(100, 100, 150, 0.2);
+         border: 1px dashed rgba(150, 150, 200, 0.5);
+         animation: pulse 2s infinite;
       }
-      .star::before { /* Corona */
+      
+      .node-image.star { animation: solar-flare 6s infinite ease-in-out; }
+      .node-image.star::before { /* Corona */
         content: '';
-        position: absolute;
-        inset: -15px;
-        border-radius: 50%;
+        position: absolute; inset: -30%; border-radius: 50%;
         background: radial-gradient(ellipse at center, rgba(255,239,128,0.5) 0%, transparent 70%);
         animation: star-pulse 3s infinite ease-in-out;
       }
-      .planet {
-        background: radial-gradient(circle at 30% 30%, #a52a2a, #2c0a0a);
-        box-shadow: inset -8px -8px 15px rgba(0,0,0,0.6);
-      }
-       .planet::after { /* Atmosphere */
+      
+      .node-image.planet { animation: spin-reverse 120s linear infinite; }
+      .node-image.planet::after { /* Atmosphere */
         content: '';
-        position: absolute;
-        inset: -4px;
-        border-radius: 50%;
+        position: absolute; inset: -10%; border-radius: 50%;
         background: radial-gradient(circle, transparent 70%, rgba(135, 206, 235, 0.2) 100%);
         animation: haze-pulse 5s infinite ease-in-out;
       }
-      .planet.hasLife {
-        background: radial-gradient(circle at 30% 30%, #4CAF50, #0e3b16);
-        animation: life-pulse 3s infinite;
+      .node-image.planet.hasLife {
+        animation-name: life-pulse, spin-reverse;
+        animation-duration: 3s, 120s;
+        animation-iteration-count: infinite, infinite;
+        animation-timing-function: ease-in-out, linear;
       }
-      .planet.hasLife::after {
+      .node-image.planet.hasLife::after {
          background: radial-gradient(circle, transparent 70%, rgba(74, 222, 128, 0.3) 100%);
-         animation-name: life-pulse, haze-pulse;
       }
-      .proto_creature {
+      
+      .node-image-container .proto_creature {
         background: #c0f; box-shadow: 0 0 5px #c0f, 0 0 8px #f0c;
-      }
-      .nebula {
-        background: radial-gradient(ellipse at 40% 50%, rgba(147, 51, 234, 0.3) 0%, rgba(76, 29, 149, 0.1) 40%, transparent 70%);
-        border-radius: 45%;
-        animation: nebula-swirl 25s infinite linear;
-      }
-       .nebula::before {
-        content: ''; position: absolute; inset: 0;
-        background: radial-gradient(ellipse at 60% 50%, rgba(30, 64, 175, 0.2) 0%, transparent 60%);
-        border-radius: 50%; animation: nebula-swirl 35s infinite reverse linear;
-      }
-      .consciousness {
-         background: #fff;
-         animation: consciousness-core-pulse 2s infinite ease-in-out;
-      }
-      .black_hole {
-        background: #000;
-        box-shadow: 0 0 15px #f0f, 0 0 25px #f0f, inset 0 0 10px #000;
-        animation: black-hole-suck 5s infinite linear;
-      }
-      .black_hole::before, .black_hole::after { /* Accretion Disk */
-        content: ''; position: absolute;
-        top: 50%; left: 50%;
         border-radius: 50%;
-        border-style: solid; border-color: transparent;
-        transform-origin: center center;
       }
-      .black_hole::before {
-        width: 250%; height: 250%;
-        margin-left: -125%; margin-top: -125%;
-        border-width: 3px;
+      
+      .node-image.nebula { animation: nebula-swirl 25s infinite linear; }
+      
+      .node-image.consciousness { animation: consciousness-core-pulse 2s infinite ease-in-out; }
+      
+      .node-image.black_hole { animation: black-hole-suck 5s infinite linear; }
+      .node-image.black_hole::before { /* Accretion Disk - using a separate animated image would be better, but for now CSS */
+        content: ''; position: absolute;
+        top: 50%; left: 50%; width: 250%; height: 250%;
+        border: 3px solid transparent;
         border-top-color: #f0f;
         border-right-color: #f0f;
+        border-radius: 50%;
         animation: accretion-disk-spin 3s linear infinite;
       }
-       .black_hole::after {
-        width: 350%; height: 350%;
-        margin-left: -175%; margin-top: -175%;
-        border-width: 2px;
-        border-bottom-color: #0ff;
-        border-left-color: #0ff;
-        animation: accretion-disk-spin 5s linear infinite reverse;
-      }
-      .sentient_ai {
-          background: radial-gradient(circle, #00c6ff, #0072ff);
-          box-shadow: 0 0 10px #00c6ff, 0 0 20px #0072ff, 0 0 35px #0072ff;
-          animation: spin 8s linear infinite reverse;
-      }
-      .sentient_ai::before {
-          content: ''; position: absolute;
-          width: 40%; height: 40%; top: 30%; left: 30%;
-          background: #fff; border-radius: 50%;
-          animation: spin 4s linear infinite, ai-core-pulse 1.5s infinite ease-in-out;
-      }
+      
+      .node-image.sentient_ai { animation: ai-core-pulse 2s infinite ease-in-out; }
 
 
       /* --- UI & Overlays --- */
@@ -310,6 +297,39 @@
       }
       @keyframes growLine { from { height: 0; top: 50%; } to { height: 150vh; top: -25vh; } }
       
+      /* New: Hydrothermal Vent Milestone */
+      .deep-sea-bg {
+        background: radial-gradient(ellipse at center, #020a1f, #000);
+        filter: blur(2px);
+      }
+      .vent-plume {
+        position: absolute;
+        bottom: 0;
+        width: 50px;
+        height: 120%;
+        background: linear-gradient(to top, rgba(20, 20, 30, 0.8), transparent);
+        filter: blur(20px);
+        animation: vent-plume 10s ease-in-out infinite alternate;
+      }
+      @keyframes vent-plume {
+        from { transform: scale(1) skewX(-5deg); }
+        to { transform: scale(1.1) skewX(5deg); }
+      }
+      .bubble {
+        position: absolute;
+        bottom: -20px;
+        border-radius: 50%;
+        background: rgba(150, 180, 255, 0.2);
+        border: 1px solid rgba(200, 220, 255, 0.3);
+        animation-name: bubble-rise;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+      }
+      @keyframes bubble-rise {
+        from { transform: translateY(0) translateX(0); opacity: 1; }
+        to { transform: translateY(-105vh) translateX(var(--sway)); opacity: 0; }
+      }
+
       /* Karma Particles */
       .particle-container { position: fixed; inset: 0; pointer-events: none; z-index: -1; }
       .particle { position: absolute; border-radius: 50%; }
@@ -321,11 +341,18 @@
       
       /* Tutorial Styles */
       .tutorial-box {
-          position: fixed; bottom: 10vh; left: 50%; transform: translateX(-50%);
-          max-width: 500px; background: rgba(10, 10, 20, 0.9);
-          border: 1px solid #4f46e5; border-radius: 8px; padding: 1.5rem;
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          max-width: 500px;
+          background: rgba(10, 10, 20, 0.9);
+          border: 1px solid #4f46e5;
+          border-radius: 8px;
+          padding: 1.5rem;
           box-shadow: 0 0 20px rgba(79, 70, 229, 0.5);
-          z-index: 101; pointer-events: auto;
+          z-index: 101;
+          pointer-events: auto;
       }
       .tutorial-highlight {
           position: fixed; border: 3px solid #14b8a6; border-radius: 8px;

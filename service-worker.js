@@ -7,6 +7,8 @@ const urlsToCache = [
   '/constants.ts',
   '/types.ts',
   '/hooks/useGameLoop.ts',
+  '/hooks/useParticles.ts',
+  '/hooks/useBackgroundEffects.ts',
   '/services/geminiService.ts',
   '/components/Notification.tsx',
   '/components/UpgradeModal.tsx',
@@ -14,7 +16,6 @@ const urlsToCache = [
   '/components/SplashScreen.tsx',
   '/components/Simulation.tsx',
   '/components/Tutorial.tsx',
-  '/components/KarmaParticles.tsx',
   '/components/MilestoneVisual.tsx',
 ];
 

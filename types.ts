@@ -12,6 +12,8 @@ export interface GameNode {
   connections: string[];
   hasLife?: boolean;
   lifespan?: number; // in ticks
+  entangledWith?: string;
+  imageUrl?: string; // New: For high-resolution generated images
 }
 
 export interface ResourceCost {
@@ -26,19 +28,55 @@ export interface Upgrade {
   title: string;
   description: string;
   cost: ResourceCost;
-  era: number;
+  chapter: number;
   prerequisites?: string[];
-  effect: (gameState: GameState) => GameState;
+  effect?: (gameState: GameState) => GameState;
+  crossroadsId?: string; // New: Triggers a narrative choice event instead of a direct effect
   karmaRequirement?: (karma: number) => boolean;
   karmaRequirementText?: string;
   exclusiveWith?: string[];
 }
 
-export interface Era {
+export interface Chapter {
   id: number;
   name: string;
   unlockThreshold: number;
+  quote: string;
 }
+
+export interface CosmicEvent {
+  type: 'distant_supernova' | 'asteroid_impact' | 'gamma_ray_burst';
+  duration: number; // in ticks
+  remaining: number; // in ticks
+  x: number; // position for visual effect
+  y: number;
+  targetId?: string; // e.g., planet ID for impact
+}
+
+export interface CosmicAnomaly {
+    id: string;
+    x: number;
+    y: number;
+    size: number;
+    type: 'energy' | 'complexity' | 'knowledge';
+    lifespan: number; // in ticks
+}
+
+export interface CrossroadsEvent {
+  id: string;
+  title: string;
+  description: string;
+  sourceUpgrade: string;
+  optionA: {
+    text: string;
+    effect: (gs: GameState) => GameState;
+  };
+  optionB: {
+    text: string;
+    effect: (gs: GameState) => GameState;
+  };
+}
+
 
 export interface GameState {
   // Core Resources
@@ -50,12 +88,16 @@ export interface GameState {
 
   // Progression
   unlockedUpgrades: Set<string>;
-  currentEra: number;
+  currentChapter: number;
   activeMilestone: string | null;
 
   // Simulation
   nodes: GameNode[];
   tick: number;
+  activeCosmicEvent: CosmicEvent | null;
+  isQuantumFoamActive: boolean;
+  lastTunnelEvent: { nodeId: string; tick: number } | null;
+  anomalies: CosmicAnomaly[];
 
   // Game Flow
   gameStarted: boolean;
@@ -64,6 +106,8 @@ export interface GameState {
   notifications: string[];
   isUpgradeModalOpen: boolean;
   tutorialStep: number;
+  activeCrossroadsEvent: CrossroadsEvent | null;
+  selectedNodeId: string | null;
 }
 
 // Actions for the game reducer
@@ -74,4 +118,9 @@ export type GameAction =
   | { type: 'DISMISS_NOTIFICATION' }
   | { type: 'ADVANCE_TUTORIAL' }
   | { type: 'COMPLETE_MILESTONE' }
-  | { type: 'START_GAME' };
+  | { type: 'START_GAME' }
+  | { type: 'CLICK_ANOMALY'; payload: { id: string } }
+  | { type: 'RESOLVE_CROSSROADS'; payload: { choiceEffect: (gs: GameState) => GameState } }
+  | { type: 'SELECT_NODE'; payload: { id: string } }
+  | { type: 'DESELECT_NODE' }
+  | { type: 'SET_NODE_IMAGE'; payload: { nodeTypeKey: string; imageUrl: string } }; // New action for images

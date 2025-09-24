@@ -9,10 +9,32 @@ const MILESTONE_DURATION = 6000; // 6 seconds
 
 const visuals: { [key: string]: React.ReactNode } = {
   spark_of_life: (
-    <div className="milestone-scene starfield">
-        <div className="comet" style={{ top: `50%`, animationDelay: `0s` }}></div>
-        <div className="impact-flash" style={{ top: 'calc(50% + 5vh)', left: '10vw' }}></div>
-        <h2 className="milestone-title">The seeds of life arrive from distant stars.</h2>
+    <div className="milestone-scene deep-sea-bg">
+      {/* Vents & Plumes */}
+      <div className="vent-plume" style={{ left: '20%', transformOrigin: 'bottom center' }}></div>
+      <div className="vent-plume" style={{ left: '50%', animationDelay: '1s', height: '100%' }}></div>
+      <div className="vent-plume" style={{ left: '75%', transformOrigin: 'bottom right' }}></div>
+      
+      {/* Bubbles */}
+      {Array.from({ length: 50 }).map((_, i) => {
+        const duration = Math.random() * 5 + 4; // 4-9 seconds
+        const delay = Math.random() * 5;
+        const size = Math.random() * 8 + 2;
+        const left = Math.random() * 100;
+        const sway = `${(Math.random() - 0.5) * 100}px`;
+        return (
+          <div key={i} className="bubble" style={{
+            left: `${left}%`,
+            width: `${size}px`,
+            height: `${size}px`,
+            animationDuration: `${duration}s`,
+            animationDelay: `${delay}s`,
+            '--sway': sway,
+          } as React.CSSProperties}></div>
+        );
+      })}
+      
+      <h2 className="milestone-title">Life stirs in the abyssal depths.</h2>
     </div>
   ),
   panspermia: (

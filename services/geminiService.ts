@@ -1,5 +1,7 @@
 // FIX: Replaced mock service with a real implementation using the @google/genai SDK.
 import { GoogleGenAI } from "@google/genai";
+import { GameNode, Chapter } from '../types';
+
 
 // Always use new GoogleGenAI({apiKey: process.env.API_KEY});
 // The API key MUST be obtained exclusively from the environment variable `process.env.API_KEY`.
@@ -38,4 +40,52 @@ export const getGeminiFlavorText = async (concept: string): Promise<string> => {
     // Return a default or fallback text on error.
     return '"The cosmos is not a collection of isolated objects but a vast and intricate web of interconnectedness."';
   }
+};
+
+
+export const getGeminiLoreForNode = async (node: GameNode, chapter: Chapter): Promise<string> => {
+    try {
+        const nodeDescription = `${node.label} (${node.type.replace(/_/g, ' ')})`;
+        const prompt = `You are the Universal Consciousness from Damien Nichols' book 'Universe Connected for Everyone'. A player is observing a cosmic entity: ${nodeDescription}. The universe is currently in the narrative chapter titled "${chapter.name}". Provide a short, profound, and slightly cryptic observation about this entity in the context of this chapter's themes. The response should be one or two sentences and not enclosed in quotes.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                systemInstruction: "You are the narrator of a profound cosmic simulation game, speaking with wisdom and a touch of mystery.",
+                temperature: 0.9,
+                topP: 0.95,
+                maxOutputTokens: 80,
+            }
+        });
+
+        return response.text.trim();
+    } catch (error) {
+        console.error(`Error fetching lore for "${node.label}":`, error);
+        return "The connection is weak... The future is clouded.";
+    }
+};
+
+export const generateNodeImage = async (prompt: string): Promise<string> => {
+    try {
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: prompt,
+            config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/png', // Use PNG for potential transparency
+                aspectRatio: '1:1',
+            },
+        });
+
+        if (response.generatedImages && response.generatedImages.length > 0) {
+            const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+            return `data:image/png;base64,${base64ImageBytes}`;
+        }
+        throw new Error("No image was generated.");
+    } catch (error) {
+        console.error(`Error generating image:`, error);
+        // In a real app, you might return a URL to a fallback placeholder image
+        throw error;
+    }
 };

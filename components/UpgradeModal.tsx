@@ -27,16 +27,16 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, gameState,
                          (upgrade.prerequisites || []).every(p => gameState.unlockedUpgrades.has(p));
 
     const isUnlocked = gameState.unlockedUpgrades.has(upgrade.id);
-    const inEra = upgrade.era <= gameState.currentEra;
+    const inChapter = upgrade.chapter <= gameState.currentChapter;
     const isExclusive = (upgrade.exclusiveWith || []).some(ex => gameState.unlockedUpgrades.has(ex));
 
-    return hasEnoughResources && meetsKarmaReq && meetsPrereqs && !isUnlocked && inEra && !isExclusive;
+    return hasEnoughResources && meetsKarmaReq && meetsPrereqs && !isUnlocked && inChapter && !isExclusive;
   };
   
   const getVisibleUpgrades = () => {
     return UPGRADES.filter(u => {
-        // Must be in the current era or an earlier one
-        if (u.era > gameState.currentEra) {
+        // Must be in the current chapter or an earlier one
+        if (u.chapter > gameState.currentChapter) {
             return false;
         }
         

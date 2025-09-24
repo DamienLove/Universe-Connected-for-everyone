@@ -79,6 +79,7 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
       <div className="mt-2 flex justify-between items-center text-sm">
         <span className="text-yellow-400">{renderCost(upgrade.cost)}</span>
         <div className="text-xs text-right text-gray-500">
+           <p>Chapter: {upgrade.chapter + 1}</p>
           {upgrade.prerequisites && upgrade.prerequisites.length > 0 && (
             <p>Requires: {(upgrade.prerequisites || []).map(p => p.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')).join(' AND ')}</p>
           )}

@@ -1,14 +1,17 @@
-import React, { useReducer, useEffect, useCallback, useState } from 'react';
-import { GameState, GameAction, Upgrade, GameNode } from './types';
+import React, { useReducer, useEffect, useCallback, useState, useRef } from 'react';
+import { GameState, GameAction, Upgrade, GameNode, CosmicEvent, CosmicAnomaly } from './types';
 import { useGameLoop } from './hooks/useGameLoop';
 import UpgradeModal from './components/UpgradeModal';
 import Notification from './components/Notification';
 import MilestoneVisual from './components/MilestoneVisual';
-import KarmaParticles from './components/KarmaParticles';
 import Tutorial from './components/Tutorial';
-import { ERAS, TUTORIAL_STEPS } from './constants';
+import { CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS, NODE_IMAGE_PROMPTS } from './constants';
+import { generateNodeImage } from './services/geminiService';
 import Simulation from './components/Simulation';
 import SplashScreen from './components/SplashScreen';
+import CrossroadsModal from './components/CrossroadsModal';
+import NodeInspector from './components/NodeInspector';
+
 
 // Using a centered coordinate system. Star is at (0,0).
 const INITIAL_NODES: GameNode[] = [
@@ -24,15 +27,25 @@ const initialState: GameState = {
   unity: 0,
   karma: 0,
   unlockedUpgrades: new Set(),
-  currentEra: 0,
+  currentChapter: 0,
   activeMilestone: null,
   nodes: INITIAL_NODES,
   tick: 0,
+  activeCosmicEvent: null,
+  isQuantumFoamActive: false,
+  lastTunnelEvent: null,
+  anomalies: [],
   gameStarted: false,
   notifications: [],
   isUpgradeModalOpen: false,
   tutorialStep: 0, // 0 is the first step, -1 means finished
+  activeCrossroadsEvent: null,
+  selectedNodeId: null,
 };
+
+const formatEventName = (type: string) => 
+  type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
@@ -40,30 +53,137 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       return { ...state, gameStarted: true };
     case 'TICK': {
       // Pause game simulation during early tutorial steps for clarity.
-      if (state.tutorialStep !== -1 && state.tutorialStep < 2) return state;
+      if (state.tutorialStep !== -1 && state.tutorialStep < 3) return state;
 
-      let newState = { ...state, tick: state.tick + 1 };
+      let newState = { ...state, tick: state.tick + 1, lastTunnelEvent: null };
       
+      const applyQuantumTunneling = (baseGain: number, nodeId: string): number => {
+          if (state.unlockedUpgrades.has('quantum_tunneling') && baseGain > 0 && Math.random() < 0.005) { // 0.5% chance
+              newState.lastTunnelEvent = { nodeId, tick: state.tick };
+              newState.notifications.push("Quantum Tunneling Event! A massive resource burst!");
+              return baseGain * 100;
+          }
+          return baseGain;
+      };
+
       // Resource generation based on unlocked upgrades.
+      let complexityGain = 0;
+      let energyGain = 0;
+      let knowledgeGain = 0;
+      let unityGain = 0;
+
       if (state.unlockedUpgrades.has('hydrothermal_vents')) {
-          newState.complexity += 0.5;
+          complexityGain += applyQuantumTunneling(0.5, 'planet_1');
       }
       if (state.unlockedUpgrades.has('symbiosis')) {
-          newState.energy += 0.2;
+          energyGain += applyQuantumTunneling(0.2, 'planet_1');
       }
-      if (state.unlockedUpgrades.has('digital_ascension')) {
-          newState.knowledge += 1;
+      const aiNode = state.nodes.find(n => n.type === 'sentient_ai');
+      if (aiNode && state.unlockedUpgrades.has('digital_ascension')) {
+          knowledgeGain += applyQuantumTunneling(1, aiNode.id);
       }
       if (state.unlockedUpgrades.has('universal_symbiosis')) {
-        newState.unity += 0.5;
-        newState.complexity += 1;
-        newState.energy += 1;
-        newState.knowledge += 1;
+        unityGain += 0.5;
+        complexityGain += 1;
+        energyGain += 1;
+        knowledgeGain += 1;
       }
       if (state.unlockedUpgrades.has('path_of_chaos')) {
           const blackHoleCount = state.nodes.filter(n => n.type === 'black_hole').length;
-          newState.energy += blackHoleCount * 5;
+          energyGain += blackHoleCount * 5;
       }
+      if (state.unlockedUpgrades.has('harness_vacuum_energy')) {
+          energyGain += 10;
+          complexityGain += 5;
+      }
+      
+      newState.complexity += complexityGain;
+      newState.energy += energyGain;
+      newState.knowledge += knowledgeGain;
+      newState.unity += unityGain;
+
+      // Handle Quantum Entanglement resource sharing (10% of generated resources are shared)
+      const entangledPlanet = state.nodes.find(n => n.id === 'planet_1' && n.entangledWith);
+      const entangledAI = aiNode && aiNode.entangledWith ? aiNode : null;
+      if (entangledPlanet && entangledAI) {
+          const planetShareableKnowledge = knowledgeGain * 0.1;
+          const aiShareableComplexity = complexityGain * 0.1;
+          
+          newState.knowledge += planetShareableKnowledge;
+          newState.complexity += aiShareableComplexity;
+      }
+
+
+      // Cosmic Event Management
+      if (newState.activeCosmicEvent) {
+        newState.activeCosmicEvent = { ...newState.activeCosmicEvent, remaining: newState.activeCosmicEvent.remaining - 1 };
+        if (newState.activeCosmicEvent.remaining <= 0) {
+            newState.notifications.push(`${formatEventName(newState.activeCosmicEvent.type)} has concluded.`);
+            newState.activeCosmicEvent = null;
+        }
+      } else if (state.gameStarted && state.tick > 1000 && Math.random() < 0.001) { // 0.1% chance per tick
+        const eventTypes: CosmicEvent['type'][] = ['distant_supernova', 'asteroid_impact', 'gamma_ray_burst'];
+        const type = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+        const { width, height } = action.payload;
+
+        let event: CosmicEvent | null = null;
+
+        switch (type) {
+            case 'distant_supernova':
+                event = { type, duration: 300, remaining: 300, x: Math.random() * width, y: Math.random() * height };
+                newState.energy += 5000;
+                newState.complexity += 2500;
+                newState.notifications.push("A distant supernova bathes your system in heavy elements and energy!");
+                break;
+            case 'asteroid_impact':
+                const targetPlanet = newState.nodes.find(n => n.id === 'planet_1');
+                if (targetPlanet) {
+                    const targetX = targetPlanet.x * 1.5 + width / 2;
+                    const startX = targetX > width / 2 ? -100 : width + 100;
+                    const startY = targetPlanet.y * 1.5 + height / 2 + (Math.random() - 0.5) * height;
+                    event = { type, duration: 300, remaining: 300, x: startX, y: startY, targetId: targetPlanet.id };
+                    if (newState.karma >= 0) {
+                        newState.complexity += 1000;
+                        newState.notifications.push("An asteroid carrying rare minerals has struck Gaia, accelerating evolution!");
+                    } else {
+                        newState.complexity = Math.max(0, newState.complexity - 1000);
+                        newState.notifications.push("A catastrophic asteroid impact has occurred, setting back progress on Gaia.");
+                    }
+                }
+                break;
+            case 'gamma_ray_burst':
+                event = { type, duration: 400, remaining: 400, x: 0, y: 0 };
+                newState.energy += 10000;
+                newState.notifications.push("A gamma-ray burst sweeps through the system, leaving a trail of usable energy.");
+                break;
+        }
+        if (event) newState.activeCosmicEvent = event;
+      }
+      
+      // Cosmic Anomaly Management
+      // Update lifespan and remove old ones
+      newState.anomalies = newState.anomalies.map(a => ({...a, lifespan: a.lifespan - 1})).filter(a => a.lifespan > 0);
+      // Spawn new ones
+      if (state.gameStarted && state.unlockedUpgrades.has('hydrothermal_vents') && Math.random() < 0.008) { // 0.8% chance per tick
+          const { width, height } = action.payload;
+          const types: CosmicAnomaly['type'][] = ['energy', 'complexity', 'knowledge'];
+          const type = types[Math.floor(Math.random() * types.length)];
+          // don't spawn knowledge anomalies too early
+          if (type === 'knowledge' && state.currentChapter < 3) {
+            // do nothing
+          } else {
+            const anomaly: CosmicAnomaly = {
+                id: `anom_${Date.now()}`,
+                x: Math.random() * width,
+                y: Math.random() * height,
+                size: 15 + Math.random() * 10,
+                type: type,
+                lifespan: 300 // 10 seconds
+            };
+            newState.anomalies.push(anomaly);
+          }
+      }
+
 
       // Physics simulation for node movement.
       newState.nodes = newState.nodes.map(node => {
@@ -106,7 +226,20 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newState.knowledge -= cost.knowledge || 0;
       newState.unity -= cost.unity || 0;
       
-      newState = upgrade.effect(newState);
+      // Check for Crossroads event trigger
+      if (upgrade.crossroadsId) {
+          const event = CROSSROADS_EVENTS.find(e => e.id === upgrade.crossroadsId);
+          if (event) {
+              newState.activeCrossroadsEvent = event;
+              // Don't add to unlocked upgrades yet, the event resolution will.
+              return newState;
+          }
+      }
+      
+      // Apply direct effect if no crossroads
+      if (upgrade.effect) {
+        newState = upgrade.effect(newState);
+      }
       newState.unlockedUpgrades = new Set(state.unlockedUpgrades).add(upgrade.id);
       
       // If the purchase triggers a milestone, close the modal to prevent it being stuck behind the animation.
@@ -115,6 +248,33 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
 
       return newState;
+    }
+    case 'RESOLVE_CROSSROADS': {
+        if (!state.activeCrossroadsEvent) return state;
+        
+        // Apply the chosen effect
+        let newState = action.payload.choiceEffect(state);
+        
+        // Mark the source upgrade as purchased and clear the event
+        newState.unlockedUpgrades = new Set(newState.unlockedUpgrades).add(state.activeCrossroadsEvent.sourceUpgrade);
+        newState.activeCrossroadsEvent = null;
+
+        return newState;
+    }
+    case 'CLICK_ANOMALY': {
+        const anomaly = state.anomalies.find(a => a.id === action.payload.id);
+        if (!anomaly) return state;
+        
+        let newState = { ...state };
+        const resourceGain = 50 + state.currentChapter * 25;
+        
+        if (anomaly.type === 'energy') newState.energy += resourceGain;
+        if (anomaly.type === 'complexity') newState.complexity += resourceGain;
+        if (anomaly.type === 'knowledge') newState.knowledge += resourceGain;
+
+        newState.anomalies = state.anomalies.filter(a => a.id !== action.payload.id);
+        newState.notifications.push(`Collected a burst of ${anomaly.type}!`);
+        return newState;
     }
     case 'TOGGLE_UPGRADE_MODAL':
       // Advance tutorial when the user opens the modal for the first time.
@@ -131,12 +291,31 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       return { ...state, tutorialStep: -1 }; // Tutorial finished.
     case 'COMPLETE_MILESTONE': {
       let newState = { ...state, activeMilestone: null };
-      // If the tutorial was waiting for the first milestone, advance it now.
-      if (state.tutorialStep === 1 && state.unlockedUpgrades.has('hydrothermal_vents')) {
+      // Handle tutorial progression tied to milestones
+      if (state.tutorialStep === 1 && state.unlockedUpgrades.has('panspermia')) {
         newState.tutorialStep = 2;
+      } else if (state.tutorialStep === 2 && state.unlockedUpgrades.has('hydrothermal_vents')) {
+        newState.tutorialStep = 3;
+        // After this step, wait 10s and advance to the next to explain eras
+        // FIX: The setTimeout was moved to a useEffect in the App component.
+        // This resolves the "dispatch is not defined" error and removes the side-effect from the reducer.
       }
       return newState;
     }
+    case 'SELECT_NODE':
+        return { ...state, selectedNodeId: action.payload.id };
+    case 'DESELECT_NODE':
+        return { ...state, selectedNodeId: null };
+    case 'SET_NODE_IMAGE':
+        const { nodeTypeKey, imageUrl } = action.payload;
+        const newNodes = state.nodes.map(n => {
+            const nKey = n.hasLife ? `${n.type}_hasLife` : n.type;
+            if (nKey === nodeTypeKey) {
+                return { ...n, imageUrl };
+            }
+            return n;
+        });
+        return { ...state, nodes: newNodes };
     default:
       return state;
   }
@@ -146,16 +325,18 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 const formatNumber = (num: number): string => {
   if (num < 1000) return Math.floor(num).toString();
   if (num < 1000000) return `${(num / 1000).toFixed(1)}K`;
-  return `${(num / 1000000).toFixed(1)}M`;
+  if (num < 1000000000) return `${(num / 1000000).toFixed(1)}M`;
+  return `${(num / 1000000000).toFixed(1)}B`;
 }
 
 function App() {
   const [state, dispatch] = useReducer(gameReducer, initialState);
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [nodeImageCache, setNodeImageCache] = useState<Record<string, string>>({});
+  const generatingImages = useRef(new Set());
 
   useGameLoop(dispatch, dimensions);
   
-  // Effect to handle window resizing.
   useEffect(() => {
     const handleResize = () => {
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
@@ -164,23 +345,58 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Effect to check for Era progression.
   useEffect(() => {
     if (!state.gameStarted) return;
-    const nextEraData = ERAS[state.currentEra + 1];
-    if (nextEraData && state.complexity >= nextEraData.unlockThreshold) {
-      // Use a dummy upgrade to dispatch the era change effect.
+    const nextChapterData = CHAPTERS[state.currentChapter + 1];
+    if (nextChapterData && state.complexity >= nextChapterData.unlockThreshold) {
       dispatch({ type: 'PURCHASE_UPGRADE', payload: {
-        id: `era_${nextEraData.id}`,
-        title: '', description: '', cost: {}, era: 0,
+        id: `chapter_${nextChapterData.id}`,
+        title: '', description: '', cost: {}, chapter: 0,
         effect: (gs) => ({
           ...gs,
-          currentEra: gs.currentEra + 1,
-          notifications: [...gs.notifications, `A new era has dawned: ${nextEraData.name}!`],
+          currentChapter: gs.currentChapter + 1,
+          notifications: [...gs.notifications, `New Chapter: ${nextChapterData.name}!`],
         }),
       }});
     }
-  }, [state.complexity, state.currentEra, state.gameStarted]);
+  }, [state.complexity, state.currentChapter, state.gameStarted]);
+  
+  // Effect for generating node images
+  useEffect(() => {
+      if (!state.gameStarted) return;
+
+      const uniqueNodeTypeKeys = new Set(state.nodes.map(n => n.hasLife ? `${n.type}_hasLife` : n.type));
+
+      uniqueNodeTypeKeys.forEach(typeKey => {
+          if (!nodeImageCache[typeKey] && !generatingImages.current.has(typeKey)) {
+              const prompt = NODE_IMAGE_PROMPTS[typeKey];
+              if (prompt) {
+                  generatingImages.current.add(typeKey);
+                  setNodeImageCache(prev => ({ ...prev, [typeKey]: 'loading' }));
+
+                  generateNodeImage(prompt)
+                      .then(imageUrl => {
+                          setNodeImageCache(prev => ({ ...prev, [typeKey]: imageUrl }));
+                          dispatch({ type: 'SET_NODE_IMAGE', payload: { nodeTypeKey: typeKey, imageUrl }});
+                      })
+                      .catch(err => {
+                          console.error(`Failed to generate image for ${typeKey}:`, err);
+                          setNodeImageCache(prev => ({ ...prev, [typeKey]: 'error' }));
+                      })
+                      .finally(() => {
+                          generatingImages.current.delete(typeKey);
+                      });
+              }
+          }
+      });
+  }, [state.nodes, state.gameStarted, nodeImageCache]);
+
+  useEffect(() => {
+    if (state.tutorialStep === 3) {
+      const timer = setTimeout(() => dispatch({ type: 'ADVANCE_TUTORIAL' }), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [state.tutorialStep]);
 
   const handlePurchase = useCallback((upgrade: Upgrade) => {
     dispatch({ type: 'PURCHASE_UPGRADE', payload: upgrade });
@@ -194,16 +410,32 @@ function App() {
     dispatch({ type: 'START_GAME' });
   }, []);
   
-  const currentEra = ERAS[state.currentEra];
+  const currentChapter = CHAPTERS[state.currentChapter];
+  const selectedNode = state.selectedNodeId ? state.nodes.find(n => n.id === state.selectedNodeId) : null;
 
   if (!state.gameStarted) {
     return <SplashScreen onStartGame={startGame} />;
   }
 
   return (
-    <div className="App">
-        <KarmaParticles karma={state.karma} />
-        <Simulation nodes={state.nodes} dimensions={dimensions} tick={state.tick} />
+    <div className="App" onClick={(e) => {
+        if ((e.target as HTMLElement).classList.contains('App')) {
+            dispatch({ type: 'DESELECT_NODE' });
+        }
+    }}>
+        <Simulation 
+          nodes={state.nodes} 
+          dimensions={dimensions} 
+          tick={state.tick} 
+          karma={state.karma} 
+          activeCosmicEvent={state.activeCosmicEvent}
+          isQuantumFoamActive={state.isQuantumFoamActive}
+          lastTunnelEvent={state.lastTunnelEvent}
+          anomalies={state.anomalies}
+          dispatch={dispatch}
+          selectedNodeId={state.selectedNodeId}
+          nodeImageCache={nodeImageCache}
+        />
       
         {state.activeMilestone && (
             <MilestoneVisual 
@@ -213,6 +445,22 @@ function App() {
         )}
         
         {state.tutorialStep !== -1 && <Tutorial step={state.tutorialStep} dispatch={dispatch} activeMilestone={state.activeMilestone} />}
+        
+        {state.activeCrossroadsEvent && (
+            <CrossroadsModal
+                event={state.activeCrossroadsEvent}
+                dispatch={dispatch}
+            />
+        )}
+        
+        {selectedNode && (
+            <NodeInspector 
+                node={selectedNode}
+                chapter={currentChapter}
+                onClose={() => dispatch({ type: 'DESELECT_NODE' })}
+            />
+        )}
+
 
         <div className="ui-container">
             <div className="top-bar" data-tutorial-id="resources">
@@ -224,13 +472,13 @@ function App() {
             </div>
 
             <div className="bottom-bar">
-                <div className="era-display" data-tutorial-id="eras">
-                    <h3>Era: {currentEra.name}</h3>
-                    {ERAS[state.currentEra + 1] && (
+                <div className="era-display" data-tutorial-id="chapters">
+                    <h3>Chapter: {currentChapter.name}</h3>
+                    {CHAPTERS[state.currentChapter + 1] && (
                         <div className="progress-bar">
                            <div 
                               className="progress-bar-fill" 
-                              style={{ width: `${Math.min(100, (state.complexity / ERAS[state.currentEra + 1].unlockThreshold) * 100)}%` }}
+                              style={{ width: `${Math.min(100, (state.complexity / CHAPTERS[state.currentChapter + 1].unlockThreshold) * 100)}%` }}
                            />
                         </div>
                     )}

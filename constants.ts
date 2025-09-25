@@ -1,6 +1,8 @@
-import { Upgrade, Chapter, TutorialStep, CrossroadsEvent, GameState } from './types';
+
+import { Upgrade, Chapter, TutorialStep, CrossroadsEvent, GameState, GameNode } from './types';
 
 export const UPGRADES: Upgrade[] = [
+  // CHAPTER 0
   {
     id: 'basic_physics',
     title: 'Basic Physics',
@@ -16,7 +18,19 @@ export const UPGRADES: Upgrade[] = [
     cost: { energy: 50, knowledge: 20 },
     prerequisites: ['basic_physics'],
     chapter: 0,
-    effect: (gs) => ({ ...gs, energy: gs.energy + 100 }),
+    effect: (gs) => {
+      const newStar: GameNode = {
+        id: `star_${gs.nodes.length}_${Date.now()}`,
+        label: 'Newborn Star',
+        type: 'star',
+        x: (Math.random() - 0.5) * 800,
+        y: (Math.random() - 0.5) * 800,
+        radius: 30 + Math.random() * 15,
+        connections: [],
+        hasLife: false,
+      };
+      return { ...gs, energy: gs.energy + 100, nodes: [...gs.nodes, newStar] };
+    },
   },
   {
     id: 'planetary_accretion',
@@ -25,16 +39,72 @@ export const UPGRADES: Upgrade[] = [
     cost: { energy: 30, knowledge: 40 },
     prerequisites: ['star_formation'],
     chapter: 0,
-    effect: (gs) => ({ ...gs }),
+    effect: (gs) => {
+      const stars = gs.nodes.filter(n => n.type === 'star');
+      if (stars.length === 0) return gs; // No star to orbit
+      const parentStar = stars[Math.floor(Math.random() * stars.length)];
+
+      const angle = Math.random() * Math.PI * 2;
+      const distance = parentStar.radius + 80 + Math.random() * 40;
+      const newPlanet: GameNode = {
+        id: `planet_${gs.nodes.length}_${Date.now()}`,
+        label: 'Rocky Planet',
+        type: 'rocky_planet',
+        x: parentStar.x + Math.cos(angle) * distance,
+        y: parentStar.y + Math.sin(angle) * distance,
+        radius: 10 + Math.random() * 5,
+        connections: [parentStar.id],
+        hasLife: false,
+      };
+      
+      const updatedNodes = gs.nodes.map(node => {
+          if (node.id === parentStar.id) {
+              return { ...node, connections: [...node.connections, newPlanet.id] };
+          }
+          return node;
+      });
+
+      return { ...gs, nodes: [...updatedNodes, newPlanet] };
+    },
   },
+  // CHAPTER 1
   {
     id: 'spark_of_life',
     title: 'Spark of Life',
-    description: 'A miraculous confluence of chemistry and energy creates the first replicating organisms.',
+    description: 'A miraculous confluence of chemistry and energy creates the first replicating organisms on a planet.',
     cost: { energy: 100, knowledge: 100 },
     prerequisites: ['planetary_accretion'],
     chapter: 1,
-    effect: (gs) => ({ ...gs, unity: gs.unity + 10, karma: gs.karma + 10, activeMilestone: 'spark_of_life' }),
+    effect: (gs) => {
+      const lifelessPlanets = gs.nodes.filter(n => n.type === 'rocky_planet' && !n.hasLife);
+      let newNodes = gs.nodes;
+
+      if (lifelessPlanets.length > 0) {
+        const targetPlanet = lifelessPlanets[Math.floor(Math.random() * lifelessPlanets.length)];
+        newNodes = gs.nodes.map(node => 
+            node.id === targetPlanet.id ? { ...node, hasLife: true } : node
+        );
+      }
+      
+      return { ...gs, nodes: newNodes, unity: gs.unity + 10, karma: gs.karma + 10, activeMilestone: 'spark_of_life' };
+    },
+  },
+  {
+    id: 'cellular_specialization',
+    title: 'Cellular Specialization',
+    description: 'Encourage your Life Seeds to develop specialized cells, greatly increasing their Biomass production.',
+    cost: { biomass: 50, knowledge: 50 },
+    chapter: 1,
+    effect: (gs) => ({ ...gs, notifications: [...gs.notifications, "Your creations are becoming more efficient."] }),
+  },
+  {
+    id: 'eukaryotic_evolution',
+    title: 'Eukaryotic Evolution',
+    description: 'A breakthrough in cellular complexity. Your Life Seeds can now evolve into Sentient Colonies.',
+    cost: { biomass: 200, knowledge: 150 },
+    prerequisites: ['cellular_specialization'],
+    chapter: 1,
+    effect: (gs) => ({ ...gs, complexity: gs.complexity + 50, notifications: [...gs.notifications, "A new evolutionary path has opened."] }),
   },
   {
     id: 'panspermia',
@@ -59,6 +129,16 @@ export const UPGRADES: Upgrade[] = [
     effect: (gs) => ({ ...gs, unity: gs.unity + 50, activeMilestone: 'mycorrhizal_networks' }),
     karmaRequirement: (k) => k < 0,
     karmaRequirementText: "Requires Negative Karma (Isolationist)",
+  },
+  // CHAPTER 2
+  {
+    id: 'collective_intelligence',
+    title: 'Collective Intelligence',
+    description: 'Your Sentient Colonies develop a shared consciousness, generating Unity as they contemplate the cosmos.',
+    cost: { biomass: 500, unity: 100 },
+    prerequisites: ['eukaryotic_evolution'],
+    chapter: 2,
+    effect: (gs) => ({ ...gs, notifications: [...gs.notifications, "The colonies have begun to think as one."] }),
   },
   {
     id: 'quantum_computing',
@@ -112,7 +192,7 @@ export const CHAPTERS: Chapter[] = [
     id: 2,
     name: "The Rise of Intelligence",
     description: "Consciousness begins to ponder its own existence.",
-    unlockCondition: (gs) => gs.unlockedUpgrades.has('panspermia') || gs.unlockedUpgrades.has('mycorrhizal_networks'),
+    unlockCondition: (gs) => gs.unlockedUpgrades.has('panspermia') || gs.unlockedUpgrades.has('mycorrhizal_networks') || gs.unlockedUpgrades.has('eukaryotic_evolution'),
   },
 ];
 

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { GameState } from '../types';
+import { GameAction, GameState } from '../types';
 import { useWorldScale } from '../hooks/useWorldScale';
 
 interface SimulationProps {
   gameState: GameState;
+  dispatch: React.Dispatch<GameAction>;
   onNodeClick: (nodeId: string | null) => void;
   selectedNodeId: string | null;
   dimensions: { width: number; height: number };
 }
 
-const Simulation: React.FC<SimulationProps> = ({ gameState, onNodeClick, selectedNodeId, dimensions }) => {
+const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, onNodeClick, selectedNodeId, dimensions }) => {
   const { width, height } = dimensions;
 
   const {
@@ -21,8 +22,6 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, onNodeClick, selecte
     isPanningRef,
     screenToWorld,
   } = useWorldScale(1.5);
-
-  const [worldMousePos, setWorldMousePos] = useState({ x: 0, y: 0 });
   
   const handleContainerClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget && !isPanningRef.current) {
@@ -32,10 +31,8 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, onNodeClick, selecte
 
   const handleSimMouseMove = (e: React.MouseEvent) => {
     handleMouseMove(e);
-    if (gameState.connectMode.active && gameState.connectMode.sourceNodeId) {
-        const { x, y } = screenToWorld(e.clientX, e.clientY, dimensions);
-        setWorldMousePos({ x, y });
-    }
+    const { x, y } = screenToWorld(e.clientX, e.clientY, dimensions);
+    dispatch({ type: 'PLAYER_MOVE', payload: { x, y } });
   };
 
   const sourceNode = gameState.connectMode.sourceNodeId
@@ -45,7 +42,6 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, onNodeClick, selecte
   return (
     <div
       className="simulation-container"
-      style={{ cursor: gameState.connectMode.active ? 'crosshair' : 'grab' }}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
@@ -77,18 +73,21 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, onNodeClick, selecte
               );
             })
           )}
-          {gameState.connectMode.active && sourceNode && (
-            <line
-                x1={sourceNode.x}
-                y1={sourceNode.y}
-                x2={worldMousePos.x}
-                y2={worldMousePos.y}
-                stroke="rgba(0, 255, 255, 0.7)"
-                strokeWidth={2 / transform.scale}
-                strokeDasharray={`${6 / transform.scale} ${3 / transform.scale}`}
-            />
-          )}
         </svg>
+
+        {/* Render Energy Orbs */}
+        {gameState.energyOrbs.map(orb => (
+          <div
+            key={orb.id}
+            className="energy-orb"
+            style={{
+              left: `${orb.x}px`,
+              top: `${orb.y}px`,
+              width: `${orb.radius * 2}px`,
+              height: `${orb.radius * 2}px`,
+            }}
+          />
+        ))}
 
         {gameState.nodes.map(node => {
           const isSelected = node.id === selectedNodeId && !gameState.connectMode.active;
@@ -104,16 +103,18 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, onNodeClick, selecte
                 top: `${node.y}px`,
                 width: `${node.radius * 2}px`,
                 height: `${node.radius * 2}px`,
-                zIndex: isSelected || isConnectSource ? 10 : 1,
+                zIndex: node.type === 'player_consciousness' ? 20 : isSelected || isConnectSource ? 10 : 1,
                 transform: isSelected ? 'scale(1.2)' : 'scale(1)',
                 boxShadow: isSelected ? '0 0 25px rgba(0, 255, 255, 0.8)' : isConnectSource ? '0 0 30px rgba(0, 220, 255, 1)' : 'none',
                 border: isConnectSource ? `2px dashed rgba(0, 255, 255, 0.9)` : 'none',
                 borderRadius: '50%',
-                transition: 'transform 0.2s ease-out, box-shadow 0.2s ease-out',
+                transition: 'transform 0.2s ease-out, box-shadow 0.2s ease-out, left 0.05s linear, top 0.05s linear',
               }}
               onClick={(e) => {
-                e.stopPropagation();
-                onNodeClick(node.id);
+                if (node.type !== 'player_consciousness') {
+                  e.stopPropagation();
+                  onNodeClick(node.id);
+                }
               }}
             >
               {node.imageUrl ? (
@@ -124,7 +125,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, onNodeClick, selecte
                   }}
                 />
               ) : (
-                <div className="node-placeholder" />
+                 <div className={classNames} />
               )}
             </div>
           );

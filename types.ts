@@ -9,6 +9,17 @@ export interface GameNode {
   connections: string[];
   hasLife: boolean;
   imageUrl?: string;
+  evolutionProgress?: number;
+}
+
+export interface EnergyOrb {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  life: number;
 }
 
 export interface Upgrade {
@@ -21,6 +32,7 @@ export interface Upgrade {
     unity?: number;
     complexity?: number;
     data?: number;
+    biomass?: number;
   };
   prerequisites?: string[];
   exclusiveWith?: string[];
@@ -64,8 +76,11 @@ export interface GameState {
   unity: number;
   complexity: number;
   data: number;
+  biomass: number;
   karma: number;
   nodes: GameNode[];
+  energyOrbs: EnergyOrb[];
+  playerNodeId: string | null;
   unlockedUpgrades: Set<string>;
   currentChapter: number;
   chapters: Chapter[];
@@ -91,4 +106,7 @@ export type GameAction =
   | { type: 'TOGGLE_UPGRADE_MODAL'; payload?: { show?: boolean } }
   | { type: 'DISMISS_NOTIFICATION' }
   | { type: 'MILESTONE_COMPLETE' }
-  | { type: 'CONNECT_NODE'; payload: { targetId: string } };
+  | { type: 'CONNECT_NODE'; payload: { targetId: string } }
+  | { type: 'SET_NODE_IMAGE'; payload: { nodeId: string; imageUrl: string } }
+  | { type: 'PLAYER_MOVE'; payload: { x: number, y: number } }
+  | { type: 'DIVIDE_CONSCIOUSNESS' };

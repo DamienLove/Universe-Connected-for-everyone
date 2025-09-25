@@ -69,9 +69,8 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      cursor: grab;
+      cursor: none;
     }
-    .simulation-container:active { cursor: grabbing; }
     
     .world-container {
       position: absolute;
@@ -114,15 +113,42 @@
     .node-image.hasLife {
       box-shadow: 0 0 15px #00ffcc, 0 0 30px #00ccff;
     }
+    .node-image.life_seed {
+        background: radial-gradient(circle, #f0fff0 0%, #abf7b1 40%, #5de566 70%, #1a9923 100%);
+        box-shadow: 0 0 10px #7cfc00, 0 0 20px #7cfc00;
+        animation: pulse 2s ease-in-out infinite, spin 120s linear infinite;
+    }
+    .node-image.sentient_colony {
+        background: radial-gradient(circle, #f3e8ff 0%, #d8b4fe 40%, #a855f7 70%, #6b21a8 100%);
+        box-shadow: 0 0 15px #c084fc, 0 0 30px #a855f7;
+        animation: pulse 3s ease-in-out infinite, spin 90s linear infinite;
+    }
+    .node-image.player_consciousness {
+        background: radial-gradient(circle, #e0f7fa 0%, #80deea 30%, #00acc1 60%, #006064 100%);
+        box-shadow: 0 0 15px #00f6ff, 0 0 30px #00f6ff, 0 0 45px #ffffff;
+        animation: pulse-player 2.5s ease-in-out infinite;
+    }
+
     .node-placeholder {
         width: 100%;
         height: 100%;
         border-radius: 50%;
         background: radial-gradient(circle, #555, #222);
     }
+    
+    .energy-orb {
+        position: absolute;
+        border-radius: 50%;
+        background: radial-gradient(circle, #fff, #fde047);
+        box-shadow: 0 0 8px #fde047, 0 0 12px #fef08a;
+        margin-left: -50%;
+        margin-top: -50%;
+    }
 
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    @keyframes pulse-player { 0%, 100% { transform: scale(1); box-shadow: 0 0 15px #00f6ff, 0 0 30px #00f6ff, 0 0 45px #ffffff; } 50% { transform: scale(1.1); box-shadow: 0 0 25px #00f6ff, 0 0 50px #00f6ff, 0 0 75px #ffffff; } }
+
 
     /* Tutorial Highlighter */
     .tutorial-highlight {

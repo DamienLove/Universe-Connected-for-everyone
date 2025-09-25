@@ -1,7 +1,7 @@
 import React from 'react';
-import { Upgrade, GameState } from '../types';
-import { UPGRADES } from '../constants';
-import UpgradeCard from './UpgradeCard';
+import { Upgrade, GameState } from './types';
+import { UPGRADES } from './constants';
+import UpgradeCard from './components/UpgradeCard';
 
 interface UpgradeModalProps {
   isOpen: boolean;

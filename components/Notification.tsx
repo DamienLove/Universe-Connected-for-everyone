@@ -14,7 +14,7 @@ const Notification: React.FC<NotificationProps> = ({ message, onDismiss }) => {
   }, [onDismiss]);
 
   return (
-    <div className="fixed top-5 right-5 bg-gray-800 bg-opacity-80 border border-teal-500 text-white p-4 rounded-lg shadow-lg animate-pulse glow-text max-w-sm z-[110]">
+    <div className="fixed bottom-5 right-5 bg-gray-800 bg-opacity-80 border border-teal-500 text-white p-4 rounded-lg shadow-lg animate-pulse glow-text max-w-sm z-[110]">
       <p>{message}</p>
     </div>
   );

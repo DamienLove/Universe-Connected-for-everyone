@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { GameNode, Chapter } from '../types';
+import { GameNode, Chapter, GameAction } from '../types';
 import { getGeminiLoreForNode } from '../services/geminiService';
 
 interface NodeInspectorProps {
   node: GameNode;
   chapter: Chapter;
   onClose: () => void;
+  dispatch: React.Dispatch<GameAction>;
 }
 
-const NodeInspector: React.FC<NodeInspectorProps> = ({ node, chapter, onClose }) => {
+const NodeInspector: React.FC<NodeInspectorProps> = ({ node, chapter, onClose, dispatch }) => {
     const [lore, setLore] = useState<string>("");
     const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -29,6 +30,10 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ node, chapter, onClose })
         }
     };
     
+    const handleStartConnection = () => {
+        dispatch({ type: 'START_CONNECTION_MODE', payload: { sourceId: node.id } });
+    };
+
     const nodeTypeFormatted = node.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
     return (
@@ -60,6 +65,13 @@ const NodeInspector: React.FC<NodeInspectorProps> = ({ node, chapter, onClose })
                 className="mt-4 w-full bg-teal-600 hover:bg-teal-500 disabled:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors"
             >
                 {isLoading ? "Awaiting..." : "Ask the Universal Consciousness"}
+            </button>
+
+            <button
+                onClick={handleStartConnection}
+                className="mt-2 w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-4 rounded transition-colors"
+            >
+                Establish Connection
             </button>
         </div>
     );

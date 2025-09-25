@@ -1,6 +1,5 @@
-
 import React, { useRef, useEffect } from 'react';
-import { useParticles } from '../hooks/useParticles';
+import { useParticles } from './hooks/useParticles';
 
 interface KarmaParticlesProps {
   karma: number;

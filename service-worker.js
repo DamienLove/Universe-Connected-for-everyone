@@ -9,15 +9,21 @@ const urlsToCache = [
   '/hooks/useGameLoop.ts',
   '/hooks/useParticles.ts',
   '/hooks/useBackgroundEffects.ts',
+  '/hooks/useWorldScale.ts',
   '/services/geminiService.ts',
+  '/services/BackgroundEffects.tsx',
   '/components/Notification.tsx',
-  '/components/UpgradeModal.tsx',
   '/components/UpgradeCard.tsx',
   '/components/SplashScreen.tsx',
   '/components/Simulation.tsx',
   '/components/Tutorial.tsx',
   '/components/MilestoneVisual.tsx',
-  '/components/BackgroundEffects.tsx',
+  '/components/NodeInspector.tsx',
+  '/UpgradeModal.tsx',
+  '/KarmaParticles.tsx',
+  '/CrossroadsModal.tsx',
+  '/manifest.json',
+  '/metadata.json'
 ];
 
 self.addEventListener('install', (event) => {

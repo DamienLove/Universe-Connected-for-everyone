@@ -10,15 +10,39 @@ export interface GameNode {
   hasLife: boolean;
   imageUrl?: string;
   evolutionProgress?: number;
+  orbit?: {
+    parentId: string;
+    distance: number;
+    angle: number;
+    speed: number;
+  };
+  vx?: number;
+  vy?: number;
 }
 
 export interface EnergyOrb {
-  id: string;
+  id:string;
   x: number;
   y: number;
   vx: number;
   vy: number;
   radius: number;
+  life: number;
+}
+
+export interface ConnectionParticle {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  progress: number; // 0 to 1
+  life: number;
+}
+
+export interface ConnectionPulse {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  progress: number; // 0 to 1
   life: number;
 }
 
@@ -80,6 +104,8 @@ export interface GameState {
   karma: number;
   nodes: GameNode[];
   energyOrbs: EnergyOrb[];
+  connectionParticles: ConnectionParticle[];
+  connectionPulses: ConnectionPulse[];
   playerNodeId: string | null;
   unlockedUpgrades: Set<string>;
   currentChapter: number;
@@ -97,7 +123,7 @@ export interface GameState {
 }
 
 export type GameAction =
-  | { type: 'TICK'; payload: { width: number; height: number } }
+  | { type: 'TICK'; payload: { width: number; height: number; mousePos: { x: number, y: number } } }
   | { type: 'START_GAME' }
   | { type: 'ADVANCE_TUTORIAL'; payload?: { forceEnd?: boolean } }
   | { type: 'RESOLVE_CROSSROADS'; payload: { choiceEffect: (gs: GameState) => GameState } }
@@ -106,7 +132,7 @@ export type GameAction =
   | { type: 'TOGGLE_UPGRADE_MODAL'; payload?: { show?: boolean } }
   | { type: 'DISMISS_NOTIFICATION' }
   | { type: 'MILESTONE_COMPLETE' }
-  | { type: 'CONNECT_NODE'; payload: { targetId: string } }
   | { type: 'SET_NODE_IMAGE'; payload: { nodeId: string; imageUrl: string } }
-  | { type: 'PLAYER_MOVE'; payload: { x: number, y: number } }
-  | { type: 'DIVIDE_CONSCIOUSNESS' };
+  | { type: 'DIVIDE_CONSCIOUSNESS' }
+  | { type: 'START_CONNECTION_MODE'; payload: { sourceId: string } }
+  | { type: 'CANCEL_CONNECTION_MODE' };

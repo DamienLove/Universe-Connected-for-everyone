@@ -1,18 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Upgrade, GameState } from '../types';
-import { getGeminiFlavorText } from '../services/geminiService';
+import { getGeminiFlavorText, generateNodeImage } from '../services/geminiService';
 
 interface UpgradeCardProps {
   upgrade: Upgrade;
   gameState: GameState;
-  onPurchase: (upgrade: Upgrade) => void;
+  onPurchase: (upgrade: Upgrade, imageUrl?: string) => void;
   isPurchaseable: (upgrade: Upgrade) => boolean;
+}
+
+const getNodeImagePrompt = (nodeType: 'star' | 'rocky_planet'): string => {
+    switch (nodeType) {
+        case 'star':
+            return "Clean vector art, a vibrant newborn star, glowing with yellow and orange plasma flares, simple bold shapes, against a deep space background, cel shaded, high contrast, 4k, HD, cinematic lighting.";
+        case 'rocky_planet':
+            return "Clean vector art of a barren, rocky exoplanet, shades of terracotta and grey, detailed with craters and canyons, simple bold shapes, against a deep space background with a distant nebula, cel shaded, high contrast, 4k, HD.";
+    }
 }
 
 const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchase, isPurchaseable }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [flavorText, setFlavorText] = useState<string>('');
   const [isLoadingFlavorText, setIsLoadingFlavorText] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   useEffect(() => {
     if (isExpanded && !flavorText && !isLoadingFlavorText) {
@@ -23,7 +33,6 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
         })
         .catch(err => {
           console.error(err);
-          // Set a default text on error so we don't try fetching again.
           setFlavorText('"The archives are silent on this matter..."');
         })
         .finally(() => {
@@ -32,10 +41,25 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
     }
   }, [isExpanded, flavorText, isLoadingFlavorText, upgrade.title]);
 
-  const handlePurchase = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent the card from toggling expansion when buying
-    if (isPurchaseable(upgrade)) {
-      onPurchase(upgrade);
+  const handlePurchase = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isPurchaseable(upgrade)) return;
+
+    if (upgrade.generatesNodeType) {
+        setIsGeneratingImage(true);
+        try {
+            const prompt = getNodeImagePrompt(upgrade.generatesNodeType);
+            const imageUrl = await generateNodeImage(prompt);
+            onPurchase(upgrade, imageUrl);
+        } catch (error) {
+            console.error("Failed to generate node image:", error);
+            // Purchase without an image as a fallback
+            onPurchase(upgrade);
+        } finally {
+            setIsGeneratingImage(false);
+        }
+    } else {
+        onPurchase(upgrade);
     }
   };
 
@@ -49,6 +73,13 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
       .join(', ');
     return `Cost: ${costString}`;
   };
+  
+  const buttonText = () => {
+      if (unlocked) return 'Unlocked';
+      if (exclusiveLock) return 'Path Not Chosen';
+      if (isGeneratingImage) return 'Generating...';
+      return 'Unlock';
+  }
 
   return (
     <div 
@@ -65,14 +96,14 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
         </div>
         <button
           onClick={handlePurchase}
-          disabled={!canBuy || unlocked || exclusiveLock}
+          disabled={!canBuy || unlocked || exclusiveLock || isGeneratingImage}
           className={`px-4 py-2 rounded transition-colors ml-4 whitespace-nowrap ${
             unlocked ? 'bg-gray-600 cursor-not-allowed' :
             exclusiveLock ? 'bg-red-900 text-gray-500 cursor-not-allowed' :
             canBuy ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700 text-gray-500 cursor-not-allowed'
           }`}
         >
-          {unlocked ? 'Unlocked' : exclusiveLock ? 'Path Not Chosen' : 'Unlock'}
+          {buttonText()}
         </button>
       </div>
 

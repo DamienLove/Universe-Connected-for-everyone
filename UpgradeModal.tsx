@@ -7,7 +7,7 @@ interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   gameState: GameState;
-  onPurchase: (upgrade: Upgrade) => void;
+  onPurchase: (upgrade: Upgrade, imageUrl?: string) => void;
 }
 
 const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, gameState, onPurchase }) => {

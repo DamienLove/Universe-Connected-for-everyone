@@ -1,4 +1,3 @@
-
 import { Upgrade, Chapter, TutorialStep, CrossroadsEvent, GameState, GameNode } from './types';
 
 export const UPGRADES: Upgrade[] = [
@@ -18,7 +17,8 @@ export const UPGRADES: Upgrade[] = [
     cost: { energy: 50, knowledge: 20 },
     prerequisites: ['basic_physics'],
     chapter: 0,
-    effect: (gs) => {
+    generatesNodeType: 'star',
+    effect: (gs, imageUrl) => {
       const newStar: GameNode = {
         id: `star_${gs.nodes.length}_${Date.now()}`,
         label: 'Newborn Star',
@@ -28,6 +28,9 @@ export const UPGRADES: Upgrade[] = [
         radius: 30 + Math.random() * 15,
         connections: [],
         hasLife: false,
+        vx: (Math.random() - 0.5) * 0.2, 
+        vy: (Math.random() - 0.5) * 0.2,
+        imageUrl: imageUrl,
       };
       return { ...gs, energy: gs.energy + 100, nodes: [...gs.nodes, newStar] };
     },
@@ -39,7 +42,8 @@ export const UPGRADES: Upgrade[] = [
     cost: { energy: 30, knowledge: 40 },
     prerequisites: ['star_formation'],
     chapter: 0,
-    effect: (gs) => {
+    generatesNodeType: 'rocky_planet',
+    effect: (gs, imageUrl) => {
       const stars = gs.nodes.filter(n => n.type === 'star');
       if (stars.length === 0) return gs; // No star to orbit
       const parentStar = stars[Math.floor(Math.random() * stars.length)];
@@ -55,6 +59,9 @@ export const UPGRADES: Upgrade[] = [
         radius: 10 + Math.random() * 5,
         connections: [parentStar.id],
         hasLife: false,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.2,
+        imageUrl: imageUrl,
       };
       
       const updatedNodes = gs.nodes.map(node => {
@@ -82,7 +89,7 @@ export const UPGRADES: Upgrade[] = [
       if (lifelessPlanets.length > 0) {
         const targetPlanet = lifelessPlanets[Math.floor(Math.random() * lifelessPlanets.length)];
         newNodes = gs.nodes.map(node => 
-            node.id === targetPlanet.id ? { ...node, hasLife: true } : node
+            node.id === targetPlanet.id ? { ...node, hasLife: true, type: 'life_seed' } : node
         );
       }
       
@@ -104,7 +111,15 @@ export const UPGRADES: Upgrade[] = [
     cost: { biomass: 200, knowledge: 150 },
     prerequisites: ['cellular_specialization'],
     chapter: 1,
-    effect: (gs) => ({ ...gs, complexity: gs.complexity + 50, notifications: [...gs.notifications, "A new evolutionary path has opened."] }),
+    effect: (gs) => {
+        const lifeSeeds = gs.nodes.filter(n => n.type === 'life_seed');
+        let newNodes = gs.nodes;
+        if(lifeSeeds.length > 0) {
+            const target = lifeSeeds[0];
+            newNodes = gs.nodes.map(n => n.id === target.id ? {...n, type: 'sentient_colony', label: 'Sentient Colony'} : n);
+        }
+        return { ...gs, nodes: newNodes, complexity: gs.complexity + 50, notifications: [...gs.notifications, "A new evolutionary path has opened."] };
+    },
   },
   {
     id: 'panspermia',
@@ -147,7 +162,7 @@ export const UPGRADES: Upgrade[] = [
     cost: { knowledge: 500, data: 100 },
     chapter: 2,
     prerequisites: [],
-    effect: (gs) => ({ ...gs, data: gs.data + 200 }),
+    effect: (gs) => ({ ...gs, data: gs.data + 200, notifications: [...gs.notifications, "Quantum Phages have been detected."] }),
   },
   {
     id: 'galactic_federation',
@@ -157,7 +172,7 @@ export const UPGRADES: Upgrade[] = [
     prerequisites: ['quantum_computing'],
     exclusiveWith: ['von_neumann_probes'],
     chapter: 2,
-    effect: (gs) => ({ ...gs, unity: gs.unity + 250, notifications: [...gs.notifications, "A new era of cosmic cooperation has begun."] }),
+    effect: (gs) => ({ ...gs, unity: gs.unity + 250, activeMilestone: 'the_great_zoom_out' }),
     karmaRequirement: (k) => k >= 50,
     karmaRequirementText: "Requires High Harmony (Karma >= 50)",
   },
@@ -169,10 +184,20 @@ export const UPGRADES: Upgrade[] = [
     prerequisites: ['quantum_computing'],
     exclusiveWith: ['galactic_federation'],
     chapter: 2,
-    effect: (gs) => ({ ...gs, complexity: gs.complexity + 250, notifications: [...gs.notifications, "The great work of universal conversion has begun."] }),
+    effect: (gs) => ({ ...gs, complexity: gs.complexity + 250, activeMilestone: 'the_great_zoom_out' }),
     karmaRequirement: (k) => k <= -50,
     karmaRequirementText: "Requires High Chaos (Karma <= -50)",
   },
+  // CHAPTER 3
+  {
+    id: 'holographic_principle',
+    title: 'Holographic Principle',
+    description: 'Understand that all the information in a volume of space can be represented by a theory on the boundary of that region. The universe is a hologram. You are the universe.',
+    cost: { data: 2000, unity: 1000, knowledge: 2000 },
+    prerequisites: ['galactic_federation', 'von_neumann_probes'],
+    chapter: 3,
+    effect: (gs) => ({...gs, activeMilestone: 'final_realization'}) // A hypothetical final win state
+  }
 ];
 
 export const CHAPTERS: Chapter[] = [
@@ -194,6 +219,12 @@ export const CHAPTERS: Chapter[] = [
     description: "Consciousness begins to ponder its own existence.",
     unlockCondition: (gs) => gs.unlockedUpgrades.has('panspermia') || gs.unlockedUpgrades.has('mycorrhizal_networks') || gs.unlockedUpgrades.has('eukaryotic_evolution'),
   },
+  {
+    id: 3,
+    name: "The Marble",
+    description: "The nature of reality is not what it seems.",
+    unlockCondition: (gs) => gs.unlockedUpgrades.has('galactic_federation') || gs.unlockedUpgrades.has('von_neumann_probes'),
+  }
 ];
 
 export const TUTORIAL_STEPS: TutorialStep[] = [

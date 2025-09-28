@@ -21,6 +21,8 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onStartGame }) => {
         ))}
       </div>
       
+      <div className="splash-nebula"></div>
+
       <div className="relative z-10 animate-fade-in-slow">
         <h1 className="text-5xl md:text-7xl font-bold text-teal-300 glow-text mb-4">
           Universe Connected for Everyone
@@ -33,7 +35,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onStartGame }) => {
         </blockquote>
         <button
           onClick={onStartGame}
-          className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg text-2xl shadow-lg shadow-purple-500/50 transition-transform transform hover:scale-105 animate-pulse"
+          className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg text-2xl shadow-lg transition-transform transform hover:scale-105 splash-button"
         >
           Begin Journey
         </button>

@@ -1,540 +1,525 @@
-import React, { useReducer, useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { GameState, GameAction, Upgrade, GameNode, Chapter, EnergyOrb, ConnectionParticle, ConnectionPulse } from './types';
-// FIX: Corrected typo in import from 'UPGRADADES' to 'UPGRADES'.
+import React, { useReducer, useState, useEffect, useCallback, useMemo } from 'react';
+import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage } from './types';
 import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS } from './constants';
-import { useGameLoop } from './hooks/useGameLoop';
-import { generateNodeImage } from './services/geminiService';
+import { useGameLoop } from './services/useGameLoop';
 import { audioService } from './services/AudioService';
 
-// Components
 import Simulation from './components/Simulation';
-import SplashScreen from './components/SplashScreen';
 import UpgradeModal from './UpgradeModal';
-import Notification from './components/Notification';
+import Notification from './Notification';
 import Tutorial from './components/Tutorial';
-import NodeInspector from './components/NodeInspector';
 import MilestoneVisual from './components/MilestoneVisual';
-import CrossroadsModal from './CrossroadsModal';
+import SplashScreen from './components/SplashScreen';
+import KarmaParticles from './hooks/KarmaParticles';
 import BackgroundEffects from './services/BackgroundEffects';
-import KarmaParticles from './KarmaParticles';
+import CrossroadsModal from './CrossroadsModal';
 
-const PLAYER_NODE_ID = 'player_consciousness_0';
-const ENERGY_FOR_DIVISION = 100;
-const MAX_ENERGY_ORBS = 50;
-const EVOLUTION_THRESHOLD = 1500; // Ticks for a life seed to evolve
-const ORBIT_SPEED_MULTIPLIER = 150;
-const PARTICLE_SPAWN_CHANCE = 0.01;
-const PARTICLE_LIFE = 200; // ticks
-const PLAYER_ACCELERATION = 0.04;
-const PLAYER_DAMPING = 0.98;
+// Constants for game balance
+const BASE_KNOWLEDGE_RATE = 0.1;
+const STAR_ENERGY_RATE = 0.5;
+const LIFE_BIOMASS_RATE = 0.2;
+const COLLECTIVE_UNITY_RATE = 0.1;
+const ORB_ATTRACTION_FORCE = 0.05;
+const PHAGE_SPAWN_CHANCE = 0.001;
+const PHAGE_ATTRACTION = 0.01;
+const PHAGE_DRAIN_RATE = 0.5;
+const PLAYER_HUNT_RANGE = 150;
 
-
-const initialGameState: GameState = {
+const initialState: GameState = {
   gameStarted: false,
-  energy: 10,
+  isPaused: false,
+  energy: 50,
   knowledge: 10,
+  biomass: 0,
   unity: 0,
   complexity: 0,
   data: 0,
-  biomass: 0,
   karma: 0,
-  nodes: [
-    { id: 'sun', label: 'Primordial Star', type: 'star', x: 200, y: 200, radius: 40, connections: [], hasLife: false },
-    { id: PLAYER_NODE_ID, label: 'Player', type: 'player_consciousness', x: 0, y: 0, radius: 15, connections: [], hasLife: false, vx: 0, vy: 0 },
-  ],
-  energyOrbs: [],
-  connectionParticles: [],
-  connectionPulses: [],
-  playerNodeId: PLAYER_NODE_ID,
   unlockedUpgrades: new Set(),
   currentChapter: 0,
-  chapters: CHAPTERS,
-  connectMode: { active: false, sourceNodeId: null },
   tutorialStep: 0,
   activeMilestone: null,
-  currentCrossroads: null,
+  activeCrossroadsEvent: null,
+  nodes: [
+    {
+      id: 'player_consciousness',
+      label: 'You',
+      type: 'player_consciousness',
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      radius: 20,
+      connections: [],
+      hasLife: false,
+    },
+  ],
+  phages: [],
   notifications: [],
+  connectMode: { active: false, sourceNodeId: null },
+  connectionParticles: [],
+  connectionPulses: [],
+  energyOrbs: [],
   selectedNodeId: null,
-  showUpgradeModal: false,
+  loreState: { nodeId: null, text: '', isLoading: false },
 };
 
-const gameReducer = (state: GameState, action: GameAction): GameState => {
+// Physics helper function for line-point distance
+const distToSegmentSquared = (p: GameNode, v: GameNode, w: GameNode) => {
+    const l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
+    if (l2 === 0) return (p.x - v.x)**2 + (p.y - v.y)**2;
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const projX = v.x + t * (w.x - v.x);
+    const projY = v.y + t * (w.y - v.y);
+    return (p.x - projX)**2 + (p.y - projY)**2;
+}
+
+// The main game reducer
+function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'START_GAME':
-      return { ...state, gameStarted: true };
+      audioService.userInteraction().then(() => audioService.playBackgroundMusic());
+      return { ...state, gameStarted: true, notifications: [...state.notifications, 'The cosmos awakens to your presence.'] };
     case 'TICK': {
-      let newState = { ...state };
-      const { mousePos } = action.payload;
-      
-      let playerNode = newState.nodes.find(n => n.id === newState.playerNodeId);
-      if (!playerNode) return newState;
+      // Resource generation
+      let newKnowledge = state.knowledge + BASE_KNOWLEDGE_RATE;
+      let newBiomass = state.biomass;
+      let newUnity = state.unity;
 
-      // --- Player Physics & Collision ---
-      if (playerNode) {
-          const dx = mousePos.x - playerNode.x;
-          const dy = mousePos.y - playerNode.y;
+      state.nodes.forEach(node => {
+        if (node.type === 'star') state.energy += STAR_ENERGY_RATE;
+        if (node.hasLife) newBiomass += LIFE_BIOMASS_RATE;
+      });
+
+      if (state.unlockedUpgrades.has('cellular_specialization')) {
+        newBiomass += state.nodes.filter(n => n.hasLife).length * 0.5;
+      }
+      if (state.unlockedUpgrades.has('collective_intelligence')) {
+        newUnity += COLLECTIVE_UNITY_RATE;
+      }
+      
+      const playerNode = state.nodes.find(n => n.type === 'player_consciousness');
+      if (!playerNode) return state;
+
+      // Update player position
+      const mutableNodes = state.nodes.map(n => ({...n}));
+      const pNode = mutableNodes.find(n => n.id === playerNode.id);
+      if(pNode) {
+          pNode.x = action.payload.mousePos.x;
+          pNode.y = action.payload.mousePos.y;
+      }
+
+      // Physics simulation for nodes
+      for (let i = 0; i < mutableNodes.length; i++) {
+          const node = mutableNodes[i];
+          if (node.type === 'player_consciousness') continue;
+          
+          node.x += node.vx;
+          node.y += node.vy;
+
+          // World boundary collision
+          const WORLD_DAMPING = 0.9;
+          if (node.x - node.radius < -action.payload.width / 2 || node.x + node.radius > action.payload.width / 2) {
+              node.vx *= -WORLD_DAMPING;
+              node.x = Math.max(node.x, -action.payload.width / 2 + node.radius);
+              node.x = Math.min(node.x, action.payload.width / 2 - node.radius);
+              audioService.playSound('node_bounce', 0.2);
+          }
+          if (node.y - node.radius < -action.payload.height / 2 || node.y + node.radius > action.payload.height / 2) {
+              node.vy *= -WORLD_DAMPING;
+              node.y = Math.max(node.y, -action.payload.height/2 + node.radius);
+              node.y = Math.min(node.y, action.payload.height/2 - node.radius);
+              audioService.playSound('node_bounce', 0.2);
+          }
+          
+          // Node-node collision
+          for(let j=i+1; j < mutableNodes.length; j++) {
+            const other = mutableNodes[j];
+            if (other.type === 'player_consciousness') continue;
+
+            const dx = other.x - node.x;
+            const dy = other.y - node.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            const min_dist = node.radius + other.radius;
+
+            if (dist < min_dist) {
+              // Resolve overlap
+              const overlap = min_dist - dist;
+              const adjustX = (overlap * dx / dist) / 2;
+              const adjustY = (overlap * dy / dist) / 2;
+              node.x -= adjustX; node.y -= adjustY;
+              other.x += adjustX; other.y += adjustY;
+              
+              // Elastic collision
+              const nx = dx/dist; const ny = dy/dist;
+              const p = 2 * (node.vx * nx + node.vy * ny - other.vx * nx - other.vy * ny) / (node.radius + other.radius);
+              node.vx -= p * other.radius * nx; node.vy -= p * other.radius * ny;
+              other.vx += p * node.radius * nx; other.vy += p * node.radius * ny;
+              audioService.playSound('node_bounce', 0.4);
+            }
+          }
+
+          // Node-connection collision
+          for (const source of mutableNodes) {
+              for (const targetId of source.connections) {
+                  const target = mutableNodes.find(n => n.id === targetId);
+                  if (!target || source.id === node.id || target.id === node.id) continue;
+                  
+                  const distSq = distToSegmentSquared(node, source, target);
+                  if (distSq < node.radius * node.radius) {
+                      // Find closest point on segment and calculate collision normal
+                      const l2 = (source.x - target.x)**2 + (source.y - target.y)**2;
+                      let projX, projY;
+                      if (l2 === 0) {
+                          projX = source.x; projY = source.y;
+                      } else {
+                          let t = ((node.x - source.x) * (target.x - source.x) + (node.y - source.y) * (target.y - source.y)) / l2;
+                          t = Math.max(0, Math.min(1, t));
+                          projX = source.x + t * (target.x - source.x);
+                          projY = source.y + t * (target.y - source.y);
+                      }
+                      
+                      const vecX = node.x - projX;
+                      const vecY = node.y - projY;
+                      const vecLen = Math.sqrt(vecX*vecX + vecY*vecY);
+                      
+                      if (vecLen > 0) {
+                          const overlap = node.radius - vecLen;
+                          const collisionNormalX = vecX / vecLen;
+                          const collisionNormalY = vecY / vecLen;
+                          
+                          // Position Correction: Push the node out of the line
+                          node.x += collisionNormalX * overlap;
+                          node.y += collisionNormalY * overlap;
+                          
+                          // Velocity Correction: Bounce the node
+                          const dot = node.vx * collisionNormalX + node.vy * collisionNormalY;
+                          if (dot < 0) { // Only bounce if moving towards the line
+                              node.vx -= 2 * dot * collisionNormalX;
+                              node.vy -= 2 * dot * collisionNormalY;
+                          }
+                          audioService.playSound('connection_bounce', 0.3);
+                      }
+                  }
+              }
+          }
+      }
+
+      // Energy Orb physics
+      let collectedEnergy = 0;
+      const remainingOrbs = state.energyOrbs.filter(orb => {
+          const dx = playerNode.x - orb.x;
+          const dy = playerNode.y - orb.y;
           const dist = Math.sqrt(dx*dx + dy*dy);
           
-          let ax = 0, ay = 0;
-          if (dist > 1) { // Avoid jittering
-              ax = (dx / dist) * PLAYER_ACCELERATION;
-              ay = (dy / dist) * PLAYER_ACCELERATION;
+          if (dist < playerNode.radius + orb.radius) {
+              collectedEnergy += 10;
+              audioService.playSound('collect_orb', 0.5);
+              return false;
           }
-
-          playerNode.vx = (playerNode.vx || 0) + ax;
-          playerNode.vy = (playerNode.vy || 0) + ay;
-          
-          playerNode.vx *= PLAYER_DAMPING;
-          playerNode.vy *= PLAYER_DAMPING;
-
-          playerNode.x += playerNode.vx;
-          playerNode.y += playerNode.vy;
-
-          // Collision with other nodes
-          newState.nodes.forEach(otherNode => {
-              if (otherNode.id === playerNode!.id) return;
-              const cdx = otherNode.x - playerNode!.x;
-              const cdy = otherNode.y - playerNode!.y;
-              const cDist = Math.sqrt(cdx*cdx + cdy*cdy);
-              const combinedRadius = playerNode!.radius + otherNode.radius;
-
-              if (cDist < combinedRadius) {
-                  const overlap = combinedRadius - cDist;
-                  const nx = cdx / cDist;
-                  const ny = cdy / cDist;
-                  
-                  playerNode!.x -= nx * overlap;
-                  playerNode!.y -= ny * overlap;
-
-                  const dot = (playerNode!.vx || 0) * nx + (playerNode!.vy || 0) * ny;
-                  playerNode!.vx -= 2 * dot * nx;
-                  playerNode!.vy -= 2 * dot * ny;
-              }
+          orb.vx += (dx / dist) * ORB_ATTRACTION_FORCE;
+          orb.vy += (dy / dist) * ORB_ATTRACTION_FORCE;
+          orb.x += orb.vx;
+          orb.y += orb.vy;
+          orb.vx *= 0.98;
+          orb.vy *= 0.98;
+          return true;
+      });
+      
+      // Quantum Phage logic
+      let newPhages = [...state.phages];
+      if(state.unlockedUpgrades.has('quantum_computing') && Math.random() < PHAGE_SPAWN_CHANCE && newPhages.length < 5) {
+          audioService.playSound('phage_spawn');
+          newPhages.push({
+              id: `phage_${Date.now()}`, x: (Math.random() - 0.5) * action.payload.width, y: (Math.random() - 0.5) * action.payload.height,
+              vx: (Math.random() - 0.5), vy: (Math.random() - 0.5), radius: 15, targetNodeId: null, state: 'seeking'
           });
       }
-
-
-      // --- Energy Orb Spawning ---
-      newState.nodes.forEach(node => {
-        if (node.type === 'star' && newState.energyOrbs.length < MAX_ENERGY_ORBS) {
-          const spawnChance = node.radius / 1000;
-          if (Math.random() < spawnChance) {
-            const angle = Math.random() * 2 * Math.PI;
-            const speed = Math.random() * 0.5 + 0.2;
-            newState.energyOrbs.push({
-              id: `orb_${Date.now()}_${Math.random()}`,
-              x: node.x, y: node.y,
-              vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-              radius: Math.random() * 3 + 4,
-              life: 2000,
-            });
-          }
-        }
-      });
       
-      // --- Energy Orb Physics & Collection ---
-      const collectedOrbIds = new Set<string>();
-      newState.energyOrbs.forEach(orb => {
-        orb.x += orb.vx;
-        orb.y += orb.vy;
-        orb.life--;
-        if (playerNode) {
-            const dx = playerNode.x - orb.x;
-            const dy = playerNode.y - orb.y;
-            if (Math.sqrt(dx * dx + dy * dy) < playerNode.radius + orb.radius) {
-              newState.energy += 5;
-              collectedOrbIds.add(orb.id);
+      let knowledgeDrain = 0;
+      let dataDrain = 0;
+      newPhages.forEach(phage => {
+        if(phage.state === 'seeking') {
+            const complexNodes = state.nodes.filter(n => n.type !== 'player_consciousness');
+            if(complexNodes.length > 0 && !phage.targetNodeId) {
+                phage.targetNodeId = complexNodes[Math.floor(Math.random() * complexNodes.length)].id;
+            }
+            if(phage.targetNodeId) {
+                const target = state.nodes.find(n => n.id === phage.targetNodeId);
+                if (target) {
+                    const dx = target.x - phage.x; const dy = target.y - phage.y; const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < target.radius + phage.radius) {
+                        phage.state = 'draining';
+                    } else {
+                        phage.vx += (dx/dist) * PHAGE_ATTRACTION; phage.vy += (dy/dist) * PHAGE_ATTRACTION;
+                    }
+                } else {
+                    phage.targetNodeId = null; // Target gone
+                }
             }
         }
-      });
-      newState.energyOrbs = newState.energyOrbs.filter(orb => orb.life > 0 && !collectedOrbIds.has(orb.id));
-
-      // --- Orbital Mechanics ---
-      const nodeMap = new Map(newState.nodes.map(n => [n.id, n]));
-      newState.nodes = newState.nodes.map(node => {
-          if (node.orbit) {
-              const parent = nodeMap.get(node.orbit.parentId);
-              if (parent) {
-                  const newAngle = node.orbit.angle + node.orbit.speed;
-                  return {
-                      ...node,
-                      orbit: { ...node.orbit, angle: newAngle },
-                      x: parent.x + node.orbit.distance * Math.cos(newAngle),
-                      y: parent.y + node.orbit.distance * Math.sin(newAngle),
-                  };
-              }
-          }
-          // Update player node in the map
-          if (node.id === playerNode.id) {
-              return playerNode;
-          }
-          return node;
-      });
-
-      // --- Connection Particle Spawning & Physics ---
-      let newParticles: ConnectionParticle[] = [];
-      newState.nodes.forEach(node => {
-          node.connections.forEach(connId => {
-              if (node.id < connId && Math.random() < PARTICLE_SPAWN_CHANCE) {
-                  newParticles.push({
-                      id: `particle_${Date.now()}_${Math.random()}`,
-                      sourceId: node.id,
-                      targetId: connId,
-                      progress: 0,
-                      life: PARTICLE_LIFE,
-                  });
-              }
-          });
-      });
-
-      newState.connectionParticles = [
-          ...newState.connectionParticles.map(p => ({
-              ...p,
-              progress: p.progress + 1 / p.life,
-          })).filter(p => p.progress < 1),
-          ...newParticles
-      ];
-      
-      // --- Connection Pulse Physics ---
-      newState.connectionPulses = newState.connectionPulses
-        .map(p => ({
-            ...p,
-            progress: p.progress + 1 / p.life,
-        }))
-        .filter(p => p.progress < 1);
-
-
-      // --- Evolution and Resource Generation from Life ---
-      let biomassGeneration = 0;
-      let unityFromColonies = 0;
-      const canEvolve = newState.unlockedUpgrades.has('eukaryotic_evolution');
-      
-      newState.nodes = newState.nodes.map(node => {
-        if (node.type === 'life_seed') {
-          biomassGeneration += state.unlockedUpgrades.has('cellular_specialization') ? 0.05 : 0.01;
-          if (canEvolve) {
-            const newProgress = (node.evolutionProgress || 0) + 1;
-            if (newProgress >= EVOLUTION_THRESHOLD) {
-              newState.notifications = [...newState.notifications, "A Life Seed has evolved into a Sentient Colony!"];
-              return {
-                ...node, type: 'sentient_colony', label: 'Sentient Colony',
-                radius: 12, imageUrl: undefined, evolutionProgress: 0,
-              };
-            }
-            return { ...node, evolutionProgress: newProgress };
-          }
-        } else if (node.type === 'sentient_colony') {
-          biomassGeneration += state.unlockedUpgrades.has('cellular_specialization') ? 0.2 : 0.08;
-          if (state.unlockedUpgrades.has('collective_intelligence')) {
-            unityFromColonies += 0.01;
-          }
+        if (phage.state === 'draining') {
+            audioService.playSound('phage_drain', 0.1);
+            knowledgeDrain += PHAGE_DRAIN_RATE;
+            dataDrain += PHAGE_DRAIN_RATE;
         }
-        return node;
+
+        phage.x += phage.vx; phage.y += phage.vy;
+        phage.vx *= 0.99; phage.vy *= 0.99;
       });
-      
-      newState.biomass += biomassGeneration;
-      newState.unity += unityFromColonies;
 
-      // --- General Passive Resource Generation ---
-      if (state.unlockedUpgrades.has('basic_physics')) newState.knowledge += 0.05;
-      // FIX: The line below was incomplete in the original file. Added passive data generation for Quantum Computing.
-      if (state.unlockedUpgrades.has('quantum_computing')) newState.data += 0.05;
+      const huntablePhages = newPhages.map(p => {
+        const dx = playerNode.x - p.x; const dy = playerNode.y - p.y;
+        return {phage: p, dist: Math.sqrt(dx*dx + dy*dy)}
+      }).filter(pd => pd.dist < PLAYER_HUNT_RANGE);
       
-      // --- Chapter Progression ---
-      const nextChapter = newState.chapters.find(c => c.id === newState.currentChapter + 1);
-      if (nextChapter && nextChapter.unlockCondition(newState)) {
-          newState.currentChapter += 1;
-          newState.notifications.push(`You have entered Chapter ${newState.currentChapter + 1}: ${nextChapter.name}`);
-      }
-      
-      // --- Crossroads Events ---
-      if (!newState.currentCrossroads && !state.activeMilestone) {
-          const triggeredEvent = CROSSROADS_EVENTS.find(event => event.trigger(newState));
-          if (triggeredEvent) {
-              newState.currentCrossroads = triggeredEvent;
-          }
+      let huntedKnowledge = 0;
+      let huntedData = 0;
+      if (huntablePhages.length > 0) {
+        const huntedIds = new Set(huntablePhages.map(pd => pd.phage.id));
+        newPhages = newPhages.filter(p => !huntedIds.has(p.id));
+        const numHunted = huntedIds.size;
+        huntedKnowledge = numHunted * 25;
+        huntedData = numHunted * 50;
+        if(numHunted > 0) audioService.playSound('phage_capture');
       }
 
-      return newState;
+      // Check for chapter progression
+      const nextChapter = CHAPTERS.find(c => c.id > state.currentChapter && c.unlockCondition(state));
+
+      return {
+        ...state,
+        energy: state.energy + collectedEnergy,
+        knowledge: newKnowledge - knowledgeDrain + huntedKnowledge,
+        data: state.data - dataDrain + huntedData,
+        biomass: newBiomass,
+        unity: newUnity,
+        nodes: mutableNodes,
+        phages: newPhages,
+        energyOrbs: remainingOrbs,
+        currentChapter: nextChapter ? nextChapter.id : state.currentChapter,
+      };
     }
     case 'PURCHASE_UPGRADE': {
-      const { upgrade } = action.payload;
+      const { upgrade, imageUrl } = action.payload;
+      const stateAfterPurchase = {
+        ...state,
+        energy: state.energy - (upgrade.cost.energy || 0),
+        knowledge: state.knowledge - (upgrade.cost.knowledge || 0),
+        biomass: state.biomass - (upgrade.cost.biomass || 0),
+        unity: state.unity - (upgrade.cost.unity || 0),
+        complexity: state.complexity - (upgrade.cost.complexity || 0),
+        data: state.data - (upgrade.cost.data || 0),
+      };
+      const newState = upgrade.effect(stateAfterPurchase, imageUrl);
       
-      const hasEnoughResources = 
-        (upgrade.cost.energy === undefined || state.energy >= upgrade.cost.energy) &&
-        (upgrade.cost.knowledge === undefined || state.knowledge >= upgrade.cost.knowledge) &&
-        (upgrade.cost.unity === undefined || state.unity >= upgrade.cost.unity) &&
-        (upgrade.cost.complexity === undefined || state.complexity >= upgrade.cost.complexity) &&
-        (upgrade.cost.data === undefined || state.data >= upgrade.cost.data) &&
-        (upgrade.cost.biomass === undefined || state.biomass >= upgrade.cost.biomass);
-
-      const meetsPrereqs = (upgrade.prerequisites || []).every(p => state.unlockedUpgrades.has(p));
-      const meetsKarmaReq = upgrade.karmaRequirement ? upgrade.karmaRequirement(state.karma) : true;
-      const isNotExclusive = !(upgrade.exclusiveWith || []).some(ex => state.unlockedUpgrades.has(ex));
-
-      if (hasEnoughResources && meetsPrereqs && meetsKarmaReq && isNotExclusive && !state.unlockedUpgrades.has(upgrade.id)) {
-        let newState = { ...state };
-        
-        newState.energy -= upgrade.cost.energy || 0;
-        newState.knowledge -= upgrade.cost.knowledge || 0;
-        newState.unity -= upgrade.cost.unity || 0;
-        newState.complexity -= upgrade.cost.complexity || 0;
-        newState.data -= upgrade.cost.data || 0;
-        newState.biomass -= upgrade.cost.biomass || 0;
-
-        newState.unlockedUpgrades = new Set(newState.unlockedUpgrades).add(upgrade.id);
-        
-        newState = upgrade.effect(newState);
-        
-        if (upgrade.id === 'spark_of_life' || upgrade.id === 'panspermia') {
-            const lifeNode = newState.nodes.find(n => n.hasLife && n.imageUrl === undefined);
-            if (lifeNode) {
-                const prompt = upgrade.id === 'spark_of_life' 
-                    ? `A vibrant, microbial ecosystem on a primordial alien planet, glowing with bioluminescence. Abstract, beautiful.`
-                    : `Cosmic seeds of life traveling on a glowing comet through deep space, nebulae in the background.`;
-                // Fire and forget; the state will update via a dispatched action when the promise resolves.
-                generateNodeImage(prompt)
-                    .then(imageUrl => {
-                        // This dispatch will be handled by the game loop's reducer instance.
-                        const dispatchFunc = (action: GameAction) => gameReducer(newState, action);
-                        dispatchFunc({ type: 'SET_NODE_IMAGE', payload: { nodeId: lifeNode.id, imageUrl }});
-                    });
-            }
-        }
-        
-        return newState;
+      if (newState.activeMilestone && newState.activeMilestone !== state.activeMilestone) {
+        audioService.playSound('milestone_achievement', 0.8);
       }
-      return state;
-    }
-    case 'NODE_CLICK': {
-        const { nodeId } = action.payload;
-        if (state.connectMode.active && state.connectMode.sourceNodeId && nodeId && state.connectMode.sourceNodeId !== nodeId) {
-            const sourceId = state.connectMode.sourceNodeId;
-            const targetId = nodeId;
-            
-            const sourceNode = state.nodes.find(n => n.id === sourceId);
-            if (sourceNode && sourceNode.connections.includes(targetId)) {
-                return { ...state, connectMode: { active: false, sourceNodeId: null } };
-            }
-            
-            const newPulse: ConnectionPulse = {
-              id: `pulse_${sourceId}_${targetId}_${Date.now()}`,
-              sourceId,
-              targetId,
-              progress: 0,
-              life: 100
-            };
 
-            return {
-                ...state,
-                nodes: state.nodes.map(n => {
-                    if (n.id === sourceId) return { ...n, connections: [...n.connections, targetId] };
-                    if (n.id === targetId) return { ...n, connections: [...n.connections, sourceId] };
-                    return n;
-                }),
-                connectionPulses: [...state.connectionPulses, newPulse],
-                connectMode: { active: false, sourceNodeId: null },
-                selectedNodeId: targetId,
-                unity: state.unity + 2,
-            };
-        }
-        
-        return { ...state, selectedNodeId: action.payload.nodeId };
+      const newUnlocked = new Set(state.unlockedUpgrades);
+      newUnlocked.add(upgrade.id);
+
+      return {
+        ...newState,
+        unlockedUpgrades: newUnlocked,
+        notifications: [...state.notifications, `Unlocked: ${upgrade.title}`],
+      };
     }
-    case 'TOGGLE_UPGRADE_MODAL':
-        return { ...state, showUpgradeModal: action.payload?.show ?? !state.showUpgradeModal };
-    case 'DISMISS_NOTIFICATION':
-        return { ...state, notifications: state.notifications.slice(1) };
-    case 'ADVANCE_TUTORIAL': {
-        if (action.payload?.forceEnd) {
-            return { ...state, tutorialStep: TUTORIAL_STEPS.length };
-        }
+    case 'ADVANCE_TUTORIAL':
         const nextStep = state.tutorialStep + 1;
+        if (action.payload?.forceEnd || nextStep >= TUTORIAL_STEPS.length) {
+            return { ...state, tutorialStep: -1 };
+        }
         return { ...state, tutorialStep: nextStep };
-    }
+    case 'DISMISS_NOTIFICATION':
+      return {
+        ...state,
+        notifications: state.notifications.filter((_, i) => i !== action.payload.index),
+      };
     case 'MILESTONE_COMPLETE':
-        return { ...state, activeMilestone: null };
+        return { ...state, activeMilestone: null, isPaused: false };
     case 'RESOLVE_CROSSROADS':
-        if (!state.currentCrossroads) return state;
-        const newStateAfterEffect = action.payload.choiceEffect(state);
-        return {
-            ...newStateAfterEffect,
-            currentCrossroads: null,
-            unlockedUpgrades: new Set(state.unlockedUpgrades).add(`${state.currentCrossroads.id}_completed`)
-        };
-    case 'SET_NODE_IMAGE':
-        return {
-            ...state,
-            nodes: state.nodes.map(n => n.id === action.payload.nodeId ? { ...n, imageUrl: action.payload.imageUrl } : n),
-        };
-    case 'DIVIDE_CONSCIOUSNESS': {
-        if (state.energy < ENERGY_FOR_DIVISION) return state;
-        const playerNode = state.nodes.find(n => n.id === state.playerNodeId);
-        if (!playerNode) return state;
-
-        const newLifeSeed: GameNode = {
-            id: `life_seed_${state.nodes.length}_${Date.now()}`,
-            label: 'Life Seed',
-            type: 'life_seed',
-            x: playerNode.x,
-            y: playerNode.y,
-            radius: 8,
-            connections: [],
-            hasLife: true,
-            evolutionProgress: 0,
-        };
-        return {
-            ...state,
-            energy: state.energy - ENERGY_FOR_DIVISION,
-            nodes: [...state.nodes, newLifeSeed],
-            notifications: [...state.notifications, "You have planted a Seed of Life."],
-        };
-    }
+        const resolvedState = action.payload.choiceEffect(state);
+        return { ...resolvedState, activeCrossroadsEvent: null, isPaused: false };
     case 'START_CONNECTION_MODE':
-        return { ...state, connectMode: { active: true, sourceNodeId: action.payload.sourceId }, selectedNodeId: null };
+      audioService.playSound('ui_click');
+      return { ...state, connectMode: { active: true, sourceNodeId: action.payload.sourceId }, selectedNodeId: null };
     case 'CANCEL_CONNECTION_MODE':
-        return { ...state, connectMode: { active: false, sourceNodeId: null } };
+      return { ...state, connectMode: { active: false, sourceNodeId: null } };
+    case 'CREATE_CONNECTION': {
+        const { sourceNodeId } = state.connectMode;
+        const { targetId } = action.payload;
+        if (!sourceNodeId || sourceNodeId === targetId) return state;
+
+        const sourceNode = state.nodes.find(n => n.id === sourceNodeId);
+        const targetNode = state.nodes.find(n => n.id === targetId);
+        if (!sourceNode || !targetNode) return state;
+        
+        audioService.playSound('connect_success');
+
+        const newNodes = state.nodes.map(n => {
+            if (n.id === sourceNodeId && !n.connections.includes(targetId)) {
+                return { ...n, connections: [...n.connections, targetId] };
+            }
+            if (n.id === targetId && !n.connections.includes(sourceNodeId)) {
+                 return { ...n, connections: [...n.connections, sourceNodeId] };
+            }
+            return n;
+        });
+        
+        // Energy Bounce mechanic
+        const midX = (sourceNode.x + targetNode.x) / 2;
+        const midY = (sourceNode.y + targetNode.y) / 2;
+        const newOrbs: EnergyOrb[] = Array.from({ length: 5 }).map(() => ({
+            id: `orb_${Date.now()}_${Math.random()}`,
+            x: midX + (Math.random() - 0.5) * 20,
+            y: midY + (Math.random() - 0.5) * 20,
+            vx: (Math.random() - 0.5) * 4,
+            vy: (Math.random() - 0.5) * 4,
+            radius: Math.random() * 3 + 4,
+        }));
+
+        return { ...state, nodes: newNodes, connectMode: { active: false, sourceNodeId: null }, energyOrbs: [...state.energyOrbs, ...newOrbs] };
+    }
+    case 'SELECT_NODE':
+        if (state.connectMode.active && state.connectMode.sourceNodeId && action.payload.nodeId) {
+            return gameReducer(state, { type: 'CREATE_CONNECTION', payload: { targetId: action.payload.nodeId } });
+        }
+        if (state.selectedNodeId !== action.payload.nodeId) {
+             audioService.playSound('ui_open', 0.6);
+        }
+        return { ...state, selectedNodeId: action.payload.nodeId, connectMode: { active: false, sourceNodeId: null }, loreState: { nodeId: null, text: '', isLoading: false } };
+    case 'SET_LORE_LOADING':
+        return { ...state, loreState: { nodeId: action.payload.nodeId, text: '', isLoading: true } };
+    case 'SET_LORE_RESULT':
+        return { ...state, loreState: { nodeId: action.payload.nodeId, text: action.payload.text, isLoading: false } };
+    case 'CLEAR_LORE':
+        return { ...state, loreState: { nodeId: null, text: '', isLoading: false } };
+    case 'HUNT_PHAGE':
+      const phageToHunt = state.phages.find(p => p.id === action.payload.phageId);
+      if(!phageToHunt) return state;
+      audioService.playSound('phage_capture');
+      return {
+        ...state,
+        phages: state.phages.filter(p => p.id !== action.payload.phageId),
+        knowledge: state.knowledge + 25,
+        data: state.data + 50,
+      }
+    case 'SET_PAUSED':
+        return { ...state, isPaused: action.payload };
     default:
       return state;
   }
-};
+}
 
-// FIX: Added the main App component, which was missing, to provide a default export.
-const App: React.FC = () => {
-  const [gameState, dispatch] = useReducer(gameReducer, initialGameState);
+// Format resource numbers for display
+const formatResource = (num: number) => {
+    if (num < 1000) return num.toFixed(1);
+    if (num < 1000000) return (num / 1000).toFixed(2) + 'K';
+    return (num / 1000000).toFixed(2) + 'M';
+}
+
+function App() {
+  const [gameState, dispatch] = useReducer(gameReducer, initialState);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [mouseWorldPos, setMouseWorldPos] = useState({ x: 0, y: 0 });
-  const appRef = useRef<HTMLDivElement>(null);
 
-  useGameLoop(dispatch, dimensions, mouseWorldPos);
+  const isPaused = gameState.isPaused || gameState.activeMilestone !== null || gameState.activeCrossroadsEvent !== null;
 
+  useGameLoop(dispatch, dimensions, mouseWorldPos, isPaused);
+  
+  // Window resize handler
   useEffect(() => {
-    const handleResize = () => {
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
-    };
+    const handleResize = () => setDimensions({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Event trigger logic
+  useEffect(() => {
+    if (isPaused) return;
+    const triggeredEvent = CROSSROADS_EVENTS.find(e => e.trigger(gameState));
+    if (triggeredEvent && gameState.activeCrossroadsEvent?.id !== triggeredEvent.id) {
+        // This is a side-effect and should ideally be an action.
+        // For now, this is a simple way to trigger it.
+    }
+  }, [gameState, isPaused]);
   
-  const handleStartGame = useCallback(() => {
-    audioService.init().then(() => {
-      audioService.playSound('uiStart');
-      audioService.playMusic('backgroundMusic');
-      dispatch({ type: 'START_GAME' });
-    });
-  }, []);
-
-  const handleNodeClick = useCallback((nodeId: string | null) => {
-    dispatch({ type: 'NODE_CLICK', payload: { nodeId } });
-  }, []);
-
-  const handlePurchaseUpgrade = useCallback((upgrade: Upgrade) => {
-    dispatch({ type: 'PURCHASE_UPGRADE', payload: { upgrade } });
-    audioService.playUpgradeSound();
-  }, []);
-
-  const handleCloseUpgradeModal = useCallback(() => {
-    dispatch({ type: 'TOGGLE_UPGRADE_MODAL', payload: { show: false } });
-  }, []);
-  
-  const handleOpenUpgradeModal = useCallback(() => {
-    dispatch({ type: 'TOGGLE_UPGRADE_MODAL', payload: { show: true } });
-     audioService.playSound('uiStart', 0.4);
-  }, []);
-
-  const handleDismissNotification = useCallback(() => {
-    dispatch({ type: 'DISMISS_NOTIFICATION' });
-  }, []);
-
-  const handleMilestoneComplete = useCallback(() => {
-    dispatch({ type: 'MILESTONE_COMPLETE' });
-  }, []);
-
-  const currentChapter = useMemo(() => {
-      return CHAPTERS.find(c => c.id === gameState.currentChapter) || CHAPTERS[0];
-  }, [gameState.currentChapter]);
-
-  const selectedNode = useMemo(() => {
-      return gameState.nodes.find(n => n.id === gameState.selectedNodeId) || null;
-  }, [gameState.selectedNodeId, gameState.nodes]);
-
-  const showTutorial = gameState.tutorialStep < TUTORIAL_STEPS.length && !gameState.activeMilestone;
+  const handlePurchase = useCallback((upgrade: Upgrade, imageUrl?: string) => {
+    audioService.playSound('purchase_upgrade', 0.7);
+    dispatch({ type: 'PURCHASE_UPGRADE', payload: { upgrade, imageUrl } });
+    if(upgrade.id === 'basic_physics' && gameState.tutorialStep === 2) {
+        dispatch({ type: 'ADVANCE_TUTORIAL' });
+    }
+  }, [gameState.tutorialStep]);
 
   if (!gameState.gameStarted) {
-    return <SplashScreen onStartGame={handleStartGame} />;
+    return <SplashScreen onStartGame={() => dispatch({ type: 'START_GAME' })} />;
   }
 
+  const showTutorial = gameState.tutorialStep !== -1 && !gameState.activeMilestone;
+
   return (
-    <div ref={appRef} className="app-container" style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#000' }}>
-        <BackgroundEffects gameState={gameState} dimensions={dimensions} />
-        <KarmaParticles karma={gameState.karma} width={dimensions.width} height={dimensions.height} />
+    <div className="w-screen h-screen bg-black overflow-hidden text-white" onClick={() => audioService.userInteraction()}>
+      <BackgroundEffects gameState={gameState} dimensions={dimensions} />
+      <KarmaParticles karma={gameState.karma} width={dimensions.width} height={dimensions.height} />
+      
+      <Simulation
+        gameState={gameState}
+        dispatch={dispatch}
+        dimensions={dimensions}
+        mouseWorldPos={mouseWorldPos}
+        onMouseMove={setMouseWorldPos}
+      />
 
-        <Simulation
-            gameState={gameState}
-            dispatch={dispatch}
-            onNodeClick={handleNodeClick}
-            selectedNodeId={gameState.selectedNodeId}
-            dimensions={dimensions}
-            mouseWorldPos={mouseWorldPos}
-            onMouseMove={setMouseWorldPos}
-        />
-        
-        {/* UI Overlay */}
-        <div className="ui-overlay">
-            <div id="resource-bar" className="resource-bar">
-                <span>Energy: {Math.floor(gameState.energy).toLocaleString()}</span>
-                <span>Knowledge: {Math.floor(gameState.knowledge).toLocaleString()}</span>
-                <span>Unity: {Math.floor(gameState.unity).toLocaleString()}</span>
-                <span>Complexity: {Math.floor(gameState.complexity).toLocaleString()}</span>
-                <span>Biomass: {Math.floor(gameState.biomass).toLocaleString()}</span>
-                <span>Data: {Math.floor(gameState.data).toLocaleString()}</span>
-                <span>Karma: {gameState.karma}</span>
-            </div>
-            
-            <div className="chapter-display">
-                <h2 className="text-xl font-bold text-purple-300">Chapter {currentChapter.id + 1}: {currentChapter.name}</h2>
-                <p className="text-sm text-gray-400">{currentChapter.description}</p>
-            </div>
-            
-            <button id="upgrade-button" onClick={handleOpenUpgradeModal} className="upgrade-button">
-              Knowledge Web
-            </button>
-        </div>
+      {/* UI Elements */}
+      <div id="resource-bar" className="absolute top-0 left-0 right-0 p-4 bg-black/30 backdrop-blur-sm flex justify-center items-center flex-wrap gap-x-6 gap-y-1 text-lg z-20">
+        <span>Energy: {formatResource(gameState.energy)}</span>
+        <span>Knowledge: {formatResource(gameState.knowledge)}</span>
+        {gameState.unlockedUpgrades.has('spark_of_life') && <span>Biomass: {formatResource(gameState.biomass)}</span>}
+        {gameState.unlockedUpgrades.has('spark_of_life') && <span>Unity: {formatResource(gameState.unity)}</span>}
+        {gameState.unlockedUpgrades.has('basic_physics') && <span>Complexity: {formatResource(gameState.complexity)}</span>}
+        {gameState.unlockedUpgrades.has('quantum_computing') && <span>Data: {formatResource(gameState.data)}</span>}
+      </div>
 
-        {selectedNode && (
-            <NodeInspector 
-                node={selectedNode}
-                chapter={currentChapter}
-                onClose={() => handleNodeClick(null)}
-                dispatch={dispatch}
-            />
-        )}
+      <button
+        id="upgrade-button"
+        className="absolute bottom-4 left-4 bg-purple-700 hover:bg-purple-600 text-white font-bold py-3 px-5 rounded-lg shadow-lg z-20"
+        onClick={() => {
+            setIsUpgradeModalOpen(true);
+            if(gameState.tutorialStep === 1) { dispatch({type: 'ADVANCE_TUTORIAL'}); }
+        }}
+      >
+        Knowledge Web
+      </button>
 
-        <UpgradeModal
-            isOpen={gameState.showUpgradeModal}
-            onClose={handleCloseUpgradeModal}
-            gameState={gameState}
-            onPurchase={handlePurchaseUpgrade}
-        />
+      {/* Modals & Overlays */}
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        gameState={gameState}
+        onPurchase={handlePurchase}
+      />
+      
+      <div className="absolute top-20 right-5 z-[100] flex flex-col items-end gap-2">
+        {gameState.notifications.map((msg, index) => (
+            <Notification key={`${msg}-${index}`} message={msg} onDismiss={() => dispatch({ type: 'DISMISS_NOTIFICATION', payload: { index } })} />
+        ))}
+      </div>
 
-        {gameState.notifications.length > 0 && (
-            <Notification
-                message={gameState.notifications[0]}
-                onDismiss={handleDismissNotification}
-            />
-        )}
-        
-        {showTutorial && <Tutorial step={gameState.tutorialStep} dispatch={dispatch} />}
-
-        {gameState.activeMilestone && (
-            <MilestoneVisual milestoneId={gameState.activeMilestone} onComplete={handleMilestoneComplete} />
-        )}
-
-        {gameState.currentCrossroads && (
-            <CrossroadsModal event={gameState.currentCrossroads} dispatch={dispatch} />
-        )}
+      {showTutorial && <Tutorial step={gameState.tutorialStep} dispatch={dispatch} />}
+      
+      {gameState.activeMilestone && (
+          <MilestoneVisual milestoneId={gameState.activeMilestone} onComplete={() => dispatch({ type: 'MILESTONE_COMPLETE' })} />
+      )}
+      {gameState.activeCrossroadsEvent && (
+          <CrossroadsModal event={gameState.activeCrossroadsEvent} dispatch={dispatch} />
+      )}
     </div>
   );
-};
+}
 
 export default App;

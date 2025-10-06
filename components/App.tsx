@@ -3,6 +3,7 @@ import React, { useReducer, useState, useEffect, useCallback, useMemo } from 're
 import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, PlayerState, ProjectionState, CollectionBloom, CollectionFlare, WorldTransform } from '../types';
 // FIX: Corrected typo from UPGRADADES to UPGRADES.
 import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS } from './constants';
+import { useGameLoop } from '../services/useGameLoop';
 import { audioService } from '../services/AudioService';
 import { getNodeImagePrompt } from '../promptService';
 import { generateNodeImage } from '../services/geminiService';
@@ -557,17 +558,7 @@ const App: React.FC = () => {
   const { transform, handleWheel, handleMouseDown, handleMouseUp, handleMouseMove, screenToWorld: rawScreenToWorld } = useWorldScale();
   const screenToWorld = useCallback((x: number, y: number) => rawScreenToWorld(x, y, dimensions), [rawScreenToWorld, dimensions]);
 
-  useEffect(() => {
-    let animationFrameId: number;
-    const loop = () => {
-      if (!gameState.isPaused) {
-        dispatch({ type: 'TICK', payload: { width: dimensions.width, height: dimensions.height, transform } });
-      }
-      animationFrameId = requestAnimationFrame(loop);
-    };
-    animationFrameId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [dispatch, dimensions, gameState.isPaused, transform]);
+  useGameLoop(dispatch, dimensions, gameState.isPaused, transform);
 
   const startGame = useCallback(async () => {
     const prompt = getNodeImagePrompt('player_consciousness');

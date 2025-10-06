@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, WheelEvent, MouseEvent } from 'react';
 import { WorldTransform } from '../types';
 
 export const useWorldScale = (initialScale = 1.5) => {
@@ -6,7 +6,7 @@ export const useWorldScale = (initialScale = 1.5) => {
   const isPanning = useRef(false);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
-  const handleWheel = useCallback((event: React.WheelEvent) => {
+  const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
     const { deltaY } = event;
     const scaleFactor = 1.1;
@@ -16,7 +16,7 @@ export const useWorldScale = (initialScale = 1.5) => {
     });
   }, []);
 
-  const handleMouseDown = useCallback((event: React.MouseEvent) => {
+  const handleMouseDown = useCallback((event: MouseEvent) => {
     // Only pan with the primary mouse button
     if (event.button !== 0) return;
     isPanning.current = true;
@@ -27,7 +27,7 @@ export const useWorldScale = (initialScale = 1.5) => {
     isPanning.current = false;
   }, []);
 
-  const handleMouseMove = useCallback((event: React.MouseEvent) => {
+  const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!isPanning.current) return;
     const dx = event.clientX - lastMousePos.current.x;
     const dy = event.clientY - lastMousePos.current.y;

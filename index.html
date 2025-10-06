@@ -372,14 +372,21 @@
     }
     
     /* New Projection Mechanic UI */
-    #aim-indicator {
+    .aim-indicator {
       position: absolute;
-      height: 2px;
-      background: linear-gradient(90deg, rgba(0, 246, 255, 0.8), rgba(0, 246, 255, 0));
+      height: 3px;
+      background: linear-gradient(90deg, rgba(0, 246, 255, 1), rgba(0, 246, 255, 0));
       transform-origin: 0% 50%;
       pointer-events: none;
-      box-shadow: 0 0 8px rgba(0, 246, 255, 0.7);
-      margin-top: -1px; /* Center it */
+      box-shadow: 0 0 10px rgba(0, 246, 255, 0.8);
+      margin-top: -1.5px; /* Center it */
+      transition: all 0.1s ease-out;
+    }
+    .aim-indicator.locked-on {
+        background: linear-gradient(90deg, #fde047, rgba(253, 224, 71, 0));
+        box-shadow: 0 0 15px #fde047;
+        height: 4px;
+        margin-top: -2px;
     }
 
     #power-meter-container {
@@ -387,16 +394,30 @@
         transform: translate(-50%, -50%);
         pointer-events: none;
     }
+    .power-meter-bg {
+        stroke: rgba(0, 246, 255, 0.15);
+    }
+    .power-meter-fg {
+        stroke: #00f6ff;
+        stroke-linecap: round;
+        filter: drop-shadow(0 0 4px #00f6ff);
+        transition: stroke-dashoffset 0.1s linear;
+    }
+    .power-meter-text {
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-shadow: 0 0 5px #000;
+    }
     
-    #projectile-trail {
+    .projectile-trail-particle {
         position: absolute;
-        width: 4px;
-        height: 80px;
-        background: linear-gradient(to top, transparent, rgba(0, 246, 255, 0.7));
-        border-radius: 2px;
-        transform-origin: 50% 100%;
-        margin-left: -2px;
-        margin-top: -80px;
+        width: 8px;
+        height: 8px;
+        background: radial-gradient(circle, #ccfbf1, #00f6ff 50%, transparent 100%);
+        border-radius: 50%;
+        margin-left: -4px;
+        margin-top: -4px;
+        pointer-events: none;
     }
 
     .reforming-particle {
@@ -597,12 +618,13 @@
       z-index: 20;
     }
     .hud-element {
-      background: rgba(10, 15, 25, 0.6);
-      border: 1px solid rgba(0, 246, 255, 0.2);
-      backdrop-filter: blur(4px);
+      background: rgba(10, 15, 25, 0.7);
+      border: 1px solid transparent;
+      border-image: linear-gradient(to bottom right, rgba(0, 246, 255, 0.4), rgba(0, 246, 255, 0.1)) 1;
+      backdrop-filter: blur(5px);
       padding: 0.5rem 1rem;
       border-radius: 8px;
-      box-shadow: 0 0 15px rgba(0, 246, 255, 0.1);
+      box-shadow: 0 0 20px rgba(0, 246, 255, 0.1), inset 0 0 10px rgba(0, 246, 255, 0.05);
     }
 
     .hud-top-bar {
@@ -623,35 +645,41 @@
     .hud-resources {
       display: flex;
       flex-direction: row;
-      gap: 1rem;
+      gap: 1.25rem;
       flex-wrap: wrap; /* Allow wrapping on small screens */
     }
     .hud-resource-item {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       font-weight: 500;
       color: #e0f2fe;
+      transition: transform 0.3s ease-out, color 0.3s ease-out, text-shadow 0.3s ease-out;
     }
     .hud-resource-item svg {
-      width: 24px;
-      height: 24px;
+      width: 26px;
+      height: 26px;
+      filter: drop-shadow(0 0 3px currentColor);
     }
     .resource-pulse {
       animation: pulse-resource 0.5s ease-out;
     }
     @keyframes pulse-resource {
-      0% { transform: scale(1); color: #e0f2fe; text-shadow: none; }
-      50% { transform: scale(1.2); color: #ffffff; text-shadow: 0 0 8px #fff; }
-      100% { transform: scale(1); color: #e0f2fe; text-shadow: none; }
+      0% { transform: scale(1); }
+      50% { 
+        transform: scale(1.15); 
+        color: #ffffff; 
+        text-shadow: 0 0 10px #fff; 
+      }
+      100% { transform: scale(1); }
     }
     
     .hud-top-center {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.25rem;
     }
 
     .hud-notifications {
@@ -663,53 +691,63 @@
 
     .hud-chapter-info {
       text-align: center;
-      color: #93c5fd;
+      color: #bae6fd;
+      margin-bottom: 0.25rem;
     }
     .hud-chapter-info h2 {
-      font-size: 1.25rem;
+      font-size: 1.3rem;
       font-weight: bold;
       color: #e0f2fe;
-      text-shadow: 0 0 5px #00f6ff;
+      text-shadow: 0 0 8px #00f6ff;
     }
 
     .hud-chapter-progress-bar {
-      width: clamp(250px, 30vw, 400px);
-      height: 8px;
-      background: rgba(0, 246, 255, 0.15);
+      width: clamp(280px, 30vw, 450px);
+      height: 10px;
+      background: rgba(0, 246, 255, 0.1);
       border: 1px solid rgba(0, 246, 255, 0.2);
-      border-radius: 4px;
+      border-radius: 5px;
       overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
-      position: relative; /* To position the text inside */
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .hud-chapter-progress-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
       height: 100%;
       background: #00f6ff;
-      box-shadow: 0 0 8px #00f6ff;
+      box-shadow: 0 0 10px #00f6ff, inset 0 0 5px rgba(255,255,255,0.5);
       transition: width 0.5s ease-out;
     }
     .chapter-progress-text {
-        position: absolute;
-        color: #000;
-        font-size: 0.6rem;
+        position: relative;
+        z-index: 1;
+        color: #083344;
+        font-size: 0.65rem;
         font-weight: bold;
-        text-shadow: 0 0 2px rgba(255, 255, 255, 0.7);
-        mix-blend-mode: overlay;
+        text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
     }
     .hud-chapter-objective {
-        font-size: 0.9rem;
-        color: #fde047; /* Yellow to stand out */
-        text-shadow: 0 0 5px #fde047;
+        font-size: 1rem;
+        color: #fef08a;
+        text-shadow: 0 0 6px #fef08a;
         margin-top: 0.25rem;
-        height: 1.25rem; /* Reserve space to prevent layout shift */
+        height: 1.5rem; /* Reserve space to prevent layout shift */
         text-align: center;
+        animation: pulse-objective 4s infinite;
+    }
+    @keyframes pulse-objective {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
     }
     
     .hud-karma-meter {
-      width: clamp(250px, 30vw, 400px);
+      width: clamp(280px, 30vw, 450px);
+      margin-top: 0.25rem;
     }
     .karma-labels {
       display: flex;
@@ -743,8 +781,9 @@
     .hud-action-buttons {
       position: absolute;
       bottom: 1rem;
-      left: 1rem;
+      right: 1rem;
       display: flex;
+      flex-direction: row-reverse;
       gap: 1rem;
       pointer-events: all;
     }
@@ -763,23 +802,35 @@
       background: linear-gradient(45deg, #14b8a6, #0d9488);
       clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%);
       transition: all 0.2s ease;
+      border: 1px solid #14b8a6;
+      box-shadow: 0 0 10px rgba(20, 184, 166, 0.4);
     }
     .action-button:hover {
         transform: scale(1.05);
         color: white;
         text-shadow: 0 0 8px white;
+        box-shadow: 0 0 15px rgba(20, 184, 166, 0.7);
+    }
+    .action-button:active {
+        transform: scale(1.02);
     }
     .action-button.purple {
       background: linear-gradient(45deg, #a855f7, #7e22ce);
+      border-color: #a855f7;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
     }
+     .action-button.purple:hover { box-shadow: 0 0 15px rgba(168, 85, 247, 0.7); }
     .action-button.blue {
       background: linear-gradient(45deg, #3b82f6, #2563eb);
+      border-color: #3b82f6;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
     }
+    .action-button.blue:hover { box-shadow: 0 0 15px rgba(59, 130, 246, 0.7); }
 
     .hud-zoom-controls {
       position: absolute;
       bottom: 1rem;
-      right: 1rem;
+      left: 1rem;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
@@ -796,15 +847,19 @@
       font-weight: 300;
       color: #ccfbf1;
       cursor: pointer;
-      background: rgba(10, 15, 25, 0.6);
-      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(10, 15, 25, 0.7);
+      border: 1px solid rgba(0, 246, 255, 0.3);
       border-radius: 50%;
       transition: all 0.2s ease;
     }
     .zoom-button:hover {
         background: #14b8a6;
-        border-color: #0d9488;
+        border-color: #ccfbf1;
         transform: scale(1.1);
+        color: white;
+    }
+    .zoom-button:active {
+        transform: scale(1.05);
     }
 
 

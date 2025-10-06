@@ -96,6 +96,13 @@ export interface CollectionFlare {
   angle: number; // in degrees
 }
 
+export interface ProjectileTrailParticle {
+    id: string;
+    x: number;
+    y: number;
+    life: number; // in ticks
+}
+
 export interface CosmicEvent {
   id: string;
   type: 'supernova' | 'gravitational_anomaly' | 'resource_bloom' | 'black_hole' | 'wave_of_harmony' | 'wave_of_discord';
@@ -162,6 +169,7 @@ export interface GameState {
   collectionEffects: CollectionEffect[];
   collectionBlooms: CollectionBloom[];
   collectionFlares: CollectionFlare[];
+  projectileTrailParticles: ProjectileTrailParticle[];
   screenShake: { intensity: number; duration: number };
   anomalyParticles: AnomalyParticle[];
   

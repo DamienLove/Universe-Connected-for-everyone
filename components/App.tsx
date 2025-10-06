@@ -49,6 +49,7 @@ const PROJECTILE_FRICTION = 0.98;
 const REFORM_DURATION = 120; // 2 seconds
 
 const ORB_COLLECTION_LEEWAY = 10; // Extra radius for easier collection
+const AIM_ASSIST_ANGLE = 0.1; // Radians for snap
 
 const TUNNEL_CHANCE_PER_TICK = 0.0005;
 const TUNNEL_DISTANCE = 400;
@@ -117,6 +118,7 @@ const initialState: GameState = {
   collectionEffects: [],
   collectionBlooms: [],
   collectionFlares: [],
+  projectileTrailParticles: [],
   selectedNodeId: null,
   aimAssistTargetId: null,
   loreState: { nodeId: null, text: '', isLoading: false },
@@ -157,19 +159,66 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextState = { ...state };
       const { width, height, transform } = action.payload;
       const worldRadius = (Math.min(width, height) * 1.5) / (state.zoomLevel + 1);
+      
+      let mutableNodes = nextState.nodes.map(n => ({...n}));
+      let playerNode = mutableNodes.find(n => n.type === 'player_consciousness');
 
       // --- PROJECTION STATE MACHINE ---
-      let playerNode = nextState.nodes.find(n => n.type === 'player_consciousness');
       if (playerNode) {
           switch (nextState.projection.playerState) {
-            case 'AIMING_DIRECTION':
-              nextState.projection.aimAngle += AIM_ROTATION_SPEED;
+            case 'AIMING_DIRECTION': {
+              let newAngle = nextState.projection.aimAngle + AIM_ROTATION_SPEED;
+              let potentialTarget: string | null = null;
+              if (nextState.settings.aimAssist) {
+                  for (const node of mutableNodes) {
+                      if (node.id === playerNode.id) continue;
+                      const angleToNode = Math.atan2(node.y - playerNode.y, node.x - playerNode.x);
+                      let angleDiff = Math.abs(newAngle - angleToNode);
+                      if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff; // Handle wrap-around
+                      if (angleDiff < AIM_ASSIST_ANGLE) {
+                          potentialTarget = node.id;
+                          break;
+                      }
+                  }
+              }
+              nextState.aimAssistTargetId = potentialTarget;
+              nextState.projection.aimAngle = newAngle;
               break;
+            }
             case 'AIMING_POWER':
               // Oscillate power between 0 and 100
               nextState.projection.power = (Math.sin(Date.now() / (1000 / POWER_OSCILLATION_SPEED)) + 1) * 50;
               break;
-            case 'PROJECTING':
+            case 'PROJECTING': {
+              // Collision Detection
+              for (const node of mutableNodes) {
+                  if (node.id === playerNode.id) continue;
+                  const dist = Math.hypot(playerNode.x - node.x, playerNode.y - node.y);
+                  if (dist < playerNode.radius + node.radius) {
+                      playerNode.vx = 0; playerNode.vy = 0;
+                      nextState.projection.playerState = 'REFORMING';
+                      nextState.projection.reformTimer = REFORM_DURATION;
+
+                      // Resource absorption based on node type
+                      let energyGain = 0, knowledgeGain = 0, biomassGain = 0, unityGain = 0, complexityGain = 0;
+                      switch(node.type) {
+                          case 'star': energyGain = 50; break;
+                          case 'rocky_planet': energyGain = 10; complexityGain = 5; break;
+                          case 'life_seed': biomassGain = 15; break;
+                          case 'sentient_colony': knowledgeGain = 20; unityGain = 10; break;
+                      }
+                      nextState.energy += energyGain;
+                      nextState.knowledge += knowledgeGain;
+                      nextState.biomass += biomassGain;
+                      nextState.unity += unityGain;
+                      nextState.complexity += complexityGain;
+
+                      nextState.screenShake = { intensity: 5, duration: 15 };
+                      audioService.playSound('node_bounce');
+                      break; // only collide with one node per frame
+                  }
+              }
+
               if (Math.hypot(playerNode.vx, playerNode.vy) < 0.1) {
                   playerNode.vx = 0;
                   playerNode.vy = 0;
@@ -177,13 +226,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   nextState.projection.reformTimer = REFORM_DURATION;
               }
               break;
+            }
             case 'REFORMING':
               nextState.projection.reformTimer--;
               if (nextState.projection.reformTimer <= 0) {
                 nextState.projection.playerState = 'IDLE';
-                // Reset player position to center
-                playerNode.x = 0;
-                playerNode.y = 0;
               }
               break;
           }
@@ -215,7 +262,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextState.data += DATA_GENERATION_RATE;
       }
       
-      let mutableNodes = nextState.nodes.map(n => ({...n}));
       const nodesToRemove = new Set<string>();
       let newEnergyOrbs: EnergyOrb[] = [];
       
@@ -334,8 +380,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       nextState.cosmicEvents = nextCosmicEvents;
 
       // --- NODE PHYSICS & PLAYER LOGIC ---
-      playerNode = mutableNodes.find(n => n.type === 'player_consciousness');
-      
       mutableNodes.forEach(node => {
         // Player is only moved by projectile physics
         if (node.type !== 'player_consciousness') {
@@ -483,10 +527,23 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       });
       nextState.phages = nextPhages;
 
+      // Update projectile trail
+      nextState.projectileTrailParticles = nextState.projectileTrailParticles
+        .map(p => ({ ...p, life: p.life - 1 }))
+        .filter(p => p.life > 0);
+      
+      if (playerNode && nextState.projection.playerState === 'PROJECTING') {
+          nextState.projectileTrailParticles.push({
+              id: `trail_${Date.now()}`,
+              x: playerNode.x,
+              y: playerNode.y,
+              life: 20, // lasts for 20 ticks
+          });
+      }
+
       nextState.nodes = mutableNodes;
       nextState.energyOrbs = [...nextState.energyOrbs, ...newEnergyOrbs];
       
-      // Update other systems...
       // Chapter progression
       const currentChapter = CHAPTERS[nextState.currentChapter];
       if (currentChapter && nextState.currentChapter < CHAPTERS.length - 1) {
@@ -568,13 +625,23 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             nextTutorialStep = 1;
         }
         return { ...state, tutorialStep: nextTutorialStep, projection: { ...state.projection, playerState: 'AIMING_DIRECTION' } };
-    case 'SET_DIRECTION':
+    case 'SET_DIRECTION': {
         if (state.projection.playerState !== 'AIMING_DIRECTION') return state;
          let nextTutorialStep2 = state.tutorialStep;
         if (state.tutorialStep === 1) {
             nextTutorialStep2 = 2;
         }
-        return { ...state, tutorialStep: nextTutorialStep2, projection: { ...state.projection, playerState: 'AIMING_POWER' } };
+        
+        // If an aim assist target is locked, set the angle to point directly at it
+        const player = state.nodes.find(n => n.type === 'player_consciousness');
+        const target = state.nodes.find(n => n.id === state.aimAssistTargetId);
+        let finalAimAngle = state.projection.aimAngle;
+        if (player && target) {
+            finalAimAngle = Math.atan2(target.y - player.y, target.x - player.x);
+        }
+
+        return { ...state, tutorialStep: nextTutorialStep2, projection: { ...state.projection, playerState: 'AIMING_POWER', aimAngle: finalAimAngle } };
+    }
     case 'LAUNCH_PLAYER': {
         if (state.projection.playerState !== 'AIMING_POWER') return state;
         const player = state.nodes.find(n => n.type === 'player_consciousness');
@@ -726,12 +793,12 @@ const App: React.FC = () => {
                       <h2>{chapterInfo.name}</h2>
                       <p>Chapter {chapterInfo.id + 1}</p>
                   </div>
-                   <div className="hud-chapter-progress-bar" title={`Chapter Progress: ${chapterProgress.toFixed(0)}%`}>
-                      <div className="hud-chapter-progress-fill" style={{ width: `${chapterProgress}%` }} />
-                      <span className="chapter-progress-text">{unlockedChapterUpgrades}/{chapterUpgrades.length} Upgrades</span>
-                   </div>
                    <div className="hud-chapter-objective">
                       <p>Objective: {chapterInfo.objective}</p>
+                   </div>
+                   <div className="hud-chapter-progress-bar" title={`Chapter Progress: ${unlockedChapterUpgrades} of ${chapterUpgrades.length} upgrades unlocked.`}>
+                      <div className="hud-chapter-progress-fill" style={{ width: `${chapterProgress}%` }} />
+                      <span className="chapter-progress-text">{unlockedChapterUpgrades}/{chapterUpgrades.length} Upgrades</span>
                    </div>
                    <div className="hud-karma-meter">
                         <div className="karma-labels">
@@ -759,15 +826,15 @@ const App: React.FC = () => {
               </div>
           </div>
 
-          <div className="hud-action-buttons">
-              <button onClick={() => setUpgradeModalOpen(true)} className="action-button">UPGRADES</button>
-              <button onClick={() => setSettingsModalOpen(true)} className="action-button purple">OPTIONS</button>
-              <button onClick={() => dispatch({type: 'SET_PAUSED', payload: !gameState.isPaused})} className="action-button blue">PAUSE</button>
-          </div>
-          
           <div className="hud-zoom-controls">
             <button onClick={() => zoom(1.2)} className="zoom-button" aria-label="Zoom In">+</button>
             <button onClick={() => zoom(1 / 1.2)} className="zoom-button" aria-label="Zoom Out">-</button>
+          </div>
+
+          <div className="hud-action-buttons">
+              <button onClick={() => dispatch({type: 'SET_PAUSED', payload: !gameState.isPaused})} className="action-button blue">PAUSE</button>
+              <button onClick={() => setSettingsModalOpen(true)} className="action-button purple">OPTIONS</button>
+              <button onClick={() => setUpgradeModalOpen(true)} className="action-button">UPGRADES</button>
           </div>
       </div>
       

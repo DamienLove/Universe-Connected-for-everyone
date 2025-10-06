@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useRef } from 'react';
 import { GameAction, GameState, WorldTransform } from '../types';
 import RadialMenu from './RadialMenu';
@@ -91,6 +93,13 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
   
   const worldRadius = (Math.min(width, height) * 1.5) / (gameState.zoomLevel + 1);
 
+  // Calculate aim angle for locked target
+  const lockedOnTarget = gameState.nodes.find(n => n.id === gameState.aimAssistTargetId);
+  let aimAngle = gameState.projection.aimAngle;
+  if (playerNode && lockedOnTarget) {
+      aimAngle = Math.atan2(lockedOnTarget.y - playerNode.y, lockedOnTarget.x - playerNode.x);
+  }
+
   return (
     <div
       className="simulation-container"
@@ -150,34 +159,40 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
         {playerNode && gameState.projection.playerState === 'AIMING_DIRECTION' && (
              <div
                 id="aim-indicator"
-                className="aim-indicator"
+                className={`aim-indicator ${lockedOnTarget ? 'locked-on' : ''}`}
                 style={{
                     left: `${playerNode.x}px`, top: `${playerNode.y}px`,
                     width: '300px',
-                    transform: `rotate(${gameState.projection.aimAngle}rad)`,
+                    transform: `rotate(${aimAngle}rad)`,
                 }}
             />
         )}
          {playerNode && gameState.projection.playerState === 'AIMING_POWER' && (
-             <div id="power-meter-container" style={{ left: `${playerNode.x}px`, top: `${playerNode.y}px` }}>
-                <svg width="120" height="120" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(0, 246, 255, 0.2)" strokeWidth="4" />
-                    <path
-                        d={`M 60 10 A 50 50 0 ${gameState.projection.power > 50 ? 1 : 0} 1 ${60 + 50 * Math.sin(2 * Math.PI * gameState.projection.power / 100)} ${60 - 50 * Math.cos(2 * Math.PI * gameState.projection.power / 100)}`}
+            <div id="power-meter-container" style={{ left: `${playerNode.x}px`, top: `${playerNode.y}px` }}>
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle cx="80" cy="80" r="70" className="power-meter-bg" strokeWidth="4" fill="none" />
+                    <circle
+                        cx="80" cy="80" r="70"
+                        className="power-meter-fg"
+                        strokeWidth="5"
                         fill="none"
-                        stroke="#00f6ff"
-                        strokeWidth="4"
-                        strokeLinecap="round"
+                        strokeDasharray={2 * Math.PI * 70}
+                        strokeDashoffset={(2 * Math.PI * 70) * (1 - gameState.projection.power / 100)}
+                        transform="rotate(-90 80 80)"
                     />
+                    <text x="80" y="80" className="power-meter-text" textAnchor="middle" dominantBaseline="central" fill="white">
+                        {Math.round(gameState.projection.power)}%
+                    </text>
                 </svg>
             </div>
         )}
-        {playerNode && gameState.projection.playerState === 'PROJECTING' && (
-             <div className="projectile-trail" style={{
-                 left: `${playerNode.x}px`, top: `${playerNode.y}px`,
-                 transform: `rotate(${Math.atan2(playerNode.vy, playerNode.vx) * (180/Math.PI) + 90}deg)`
-             }}/>
-        )}
+        {gameState.projectileTrailParticles.map(p => (
+            <div key={p.id} className="projectile-trail-particle" style={{
+                left: p.x, top: p.y,
+                opacity: p.life / 20, // Fade out
+                transform: `scale(${p.life / 20})`,
+            }} />
+        ))}
          {playerNode && gameState.projection.playerState === 'REFORMING' && (
              <>
               {Array.from({length: 20}).map((_, i) => {

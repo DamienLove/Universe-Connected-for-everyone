@@ -13,6 +13,7 @@ export interface ProjectionState {
   angle: number; // in radians
   power: number; // 0 to 1
   launchPosition: { x: number; y: number };
+  powerDirection: 1 | -1;
 }
 
 export interface GameNode {

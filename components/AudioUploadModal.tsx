@@ -100,9 +100,9 @@ const AudioUploadModal: React.FC<AudioUploadModalProps> = ({ onClose }) => {
 
         <div className="space-y-4">
           <div>
-            <h3 className="text-xl font-bold text-teal-300 mt-6 mb-2 border-b border-teal-500/30 pb-1">Development Sync</h3>
+            <h3 className="text-xl font-bold text-teal-300 mt-6 mb-2 border-b border-teal-500/30 pb-1">Developer Tools</h3>
             <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 text-gray-300">
-              <p className="mb-3 text-sm">Reload the page to apply recent code changes from your development environment.</p>
+              <p className="mb-3 text-sm">To see your latest code changes, you must reload the application. The GitHub button is only a link to the source code repository for viewing; it does not pull files.</p>
               <button
                 onClick={() => window.location.reload()}
                 className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded transition-colors mb-3"

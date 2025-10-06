@@ -33,6 +33,7 @@ const RadialMenu: React.FC<RadialMenuProps> = ({ node, dispatch, onAsk }) => {
                 return (
                     <button
                         key={button.id}
+                        data-button-id={button.id}
                         className="radial-menu-button"
                         style={{
                             transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,

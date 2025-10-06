@@ -231,7 +231,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     { text: "Welcome, nascent consciousness. The cosmos is yours to shape. <strong>Click anywhere</strong> to begin projecting your will.", highlight: '.simulation-container' },
     { text: "You are now aiming. An indicator shows your trajectory. <strong>Click again</strong> to lock in the angle and start charging your projection.", highlight: '.aim-indicator' },
     { text: "Your power is building. More power means a faster projection. <strong>Click a final time</strong> to launch.", highlight: '#power-meter-container' },
-    { text: "Your projection can <strong>collect Motes of Potential</strong> or <strong>form connections</strong> with new worlds. Explore!", highlight: '.simulation-container' },
+    { text: "Your projection reforms at your launch point. Explore to gather resources and find new worlds.", highlight: '.simulation-container' },
+    { text: "This is a world, a potential nexus for your influence. <strong>Click on it</strong> to see your options.", highlight: '[data-node-id="tutorial_planet"]' },
+    { text: "A radial menu has appeared. The 'Ask' button queries the Universal Consciousness for insight. <strong>Click the sparkling icon.</strong>", highlight: '[data-button-id="ask"]' },
     { text: "Unlock new abilities in the <strong>Upgrades</strong> panel. May your journey be infinite.", highlight: 'button:last-of-type' },
 ];
 

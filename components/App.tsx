@@ -88,6 +88,18 @@ const initialState: GameState = {
       playerState: 'IDLE',
       reformTimer: 0,
     },
+    {
+      id: 'tutorial_planet',
+      label: 'Silent World',
+      type: 'rocky_planet',
+      x: 200,
+      y: -150,
+      vx: 0,
+      vy: 0,
+      radius: 15,
+      connections: [],
+      hasLife: false,
+    },
   ],
   phages: [],
   cosmicEvents: [],
@@ -98,6 +110,7 @@ const initialState: GameState = {
       angle: -Math.PI / 2, // Start pointing up
       power: 0,
       launchPosition: { x: 0, y: 0 },
+      powerDirection: 1,
   },
   connectionParticles: [],
   energyOrbs: [],
@@ -164,6 +177,21 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const mutableNodes = nextState.nodes.map(n => ({...n}));
       let newEnergyOrbs: EnergyOrb[] = [];
       
+      // --- POWER METER OSCILLATION ---
+      let nextProjectionState = { ...nextState.projectionState };
+      if (nextProjectionState.phase === 'charging') {
+        let newPower = nextProjectionState.power + 0.02 * nextProjectionState.powerDirection;
+        if (newPower >= 1) {
+          newPower = 1;
+          nextProjectionState.powerDirection = -1;
+        } else if (newPower <= 0) {
+          newPower = 0;
+          nextProjectionState.powerDirection = 1;
+        }
+        nextProjectionState.power = newPower;
+        nextState.projectionState = nextProjectionState;
+      }
+
       // --- COSMIC EVENT MANAGEMENT ---
       let nextCosmicEvents = [...nextState.cosmicEvents];
       
@@ -345,6 +373,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               if (playerNode.reformTimer! <= 0) {
                   playerNode.playerState = 'IDLE';
                   nextState.projectionState = {...initialState.projectionState, launchPosition: { x: playerNode.x, y: playerNode.y }};
+                  if (nextState.tutorialStep === 3) {
+                    nextState.tutorialStep++;
+                  }
               }
           }
       }
@@ -434,8 +465,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'END_CHAPTER_TRANSITION':
       return { ...state, activeChapterTransition: null };
     case 'SELECT_NODE':
+      if (state.tutorialStep === 4 && action.payload.nodeId === 'tutorial_planet') {
+        return { ...state, selectedNodeId: action.payload.nodeId, tutorialStep: 5 };
+      }
       return { ...state, selectedNodeId: action.payload.nodeId };
     case 'SET_LORE_LOADING':
+      if (state.tutorialStep === 5 && action.payload.nodeId === 'tutorial_planet') {
+          return { ...state, loreState: { nodeId: action.payload.nodeId, text: '', isLoading: true }, tutorialStep: 6 };
+      }
       return { ...state, loreState: { nodeId: action.payload.nodeId, text: '', isLoading: true } };
     case 'SET_LORE_RESULT':
       if (state.loreState.nodeId !== action.payload.nodeId) return state; // Stale response
@@ -448,20 +485,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const playerNode = state.nodes.find(n => n.type === 'player_consciousness');
       if (!playerNode || playerNode.playerState !== 'IDLE') return state;
 
-      let nextPhase = state.projectionState.phase;
       let nextState = { ...state };
-
-      switch (state.projectionState.phase) {
+      let nextProjectionState = { ...state.projectionState };
+      const currentPhase = state.projectionState.phase;
+      
+      switch (currentPhase) {
           case 'inactive':
-              nextPhase = 'aiming';
+              nextProjectionState.phase = 'aiming';
               if (state.tutorialStep === 0) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
               break;
           case 'aiming':
-              nextPhase = 'charging';
-               if (state.tutorialStep === 1) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
+              nextProjectionState.phase = 'charging';
+              nextProjectionState.power = 0;
+              nextProjectionState.powerDirection = 1;
+              if (state.tutorialStep === 1) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
               break;
           case 'charging':
-              nextPhase = 'inactive';
               const speed = PLAYER_PROJECTION_MIN_SPEED + state.projectionState.power * (PLAYER_PROJECTION_MAX_SPEED - PLAYER_PROJECTION_MIN_SPEED);
               const angle = state.aimAssistTargetId 
                   ? Math.atan2(
@@ -483,11 +522,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   return n;
               });
               nextState.nodes = newNodes;
+              
+              // Reset projection state for the next shot after reforming
+              nextProjectionState = { ...initialState.projectionState, phase: 'inactive' };
+
               if (state.tutorialStep === 2) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
-              if (state.tutorialStep === 3) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
               break;
       }
-      return { ...nextState, projectionState: { ...state.projectionState, phase: nextPhase, power: 0, launchPosition: { x: playerNode.x, y: playerNode.y } }};
+      
+      nextProjectionState.launchPosition = { x: playerNode.x, y: playerNode.y };
+      return { ...nextState, projectionState: nextProjectionState };
     }
     case 'AIM_WITH_MOUSE': {
         if (state.projectionState.phase !== 'aiming') return state;

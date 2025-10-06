@@ -398,6 +398,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
         {gameState.nodes.map(node => (
             <div
                 key={node.id}
+                data-node-id={node.id}
                 onClick={(e) => {
                     e.stopPropagation();
                     handleNodeClick(node.id);

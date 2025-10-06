@@ -37,11 +37,19 @@ class AudioService {
     if (!this.audioContext || !path) return;
     try {
       const response = await fetch(path);
+      if (!response.ok) {
+        throw new Error(`Audio file not found: ${path}`);
+      }
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       this.soundBuffers[id] = audioBuffer;
     } catch (error) {
-      console.error(`Failed to load sound: ${id} from ${path}`, error);
+      // If loading fails, create a silent placeholder buffer to prevent app crash.
+      console.warn(`Failed to load sound '${id}' from '${path}'. Using silent placeholder.`, error);
+      if (this.audioContext) {
+        const buffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate);
+        this.soundBuffers[id] = buffer;
+      }
     }
   }
 
@@ -78,7 +86,9 @@ class AudioService {
   }
 
   public playSound(id: string, volume = 1): void {
-    if (!this.audioContext || !this.soundBuffers[id]) return;
+    if (!this.audioContext || !this.soundBuffers[id] || this.soundBuffers[id].length <= 1) {
+        return; // Do not play silent placeholders
+    }
 
     const source = this.audioContext.createBufferSource();
     source.buffer = this.soundBuffers[id];
@@ -92,7 +102,9 @@ class AudioService {
   }
 
   public playBackgroundMusic(volume = 0.3): void {
-    if (!this.audioContext || !this.soundBuffers.background) return;
+    if (!this.audioContext || !this.soundBuffers.background || this.soundBuffers.background.length <= 1) {
+        return; // Do not play silent placeholders
+    }
 
     if (this.backgroundMusicSource) {
       this.backgroundMusicSource.stop();

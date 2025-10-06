@@ -1,13 +1,23 @@
 from playwright.sync_api import sync_playwright, Page, expect
+import sys
 
 def run_verification(page: Page):
     """
-    This script verifies that the Dev Panel button is visible and that clicking it
-    opens the SFX Upload Panel.
+    This script now captures console logs to debug why the page is blank.
     """
+    # Capture all console messages
+    page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}", file=sys.stderr))
+
     # 1. Arrange: Go to the application's URL.
-    # The dev server runs on port 3000 as per vite.config.ts
-    page.goto("http://localhost:3000")
+    try:
+        page.goto("http://localhost:3001", wait_until="networkidle")
+    except Exception as e:
+        print(f"Failed to navigate to page: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+    # Take a screenshot for debugging purposes to see the initial state.
+    page.screenshot(path="jules-scratch/verification/debug_initial_page.png")
 
     # 2. Act: Start the game.
     # Find the "Start Game" button and click it. Increase timeout for animations.

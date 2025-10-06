@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { GameAction, GameState, GameNode, WorldTransform } from '../types';
 import RadialMenu from './RadialMenu';
@@ -18,27 +19,14 @@ interface SimulationProps {
     handleMouseMove: (event: React.MouseEvent) => void;
   };
   screenToWorld: (screenX: number, screenY: number) => { x: number; y: number };
+  isPanningRef: React.MutableRefObject<boolean>;
 }
 
 const PLAYER_HUNT_RANGE = 150;
 const TUNNEL_DURATION_TICKS = 60; // Must match constant in App.tsx
 
-const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions, isZoomingOut, transform, worldScaleHandlers, screenToWorld }) => {
+const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions, isZoomingOut, transform, worldScaleHandlers, screenToWorld, isPanningRef }) => {
   const { width, height } = dimensions;
-
-  const isPanningRef = React.useRef(false);
-  const handleMouseDown = (e: React.MouseEvent) => {
-      isPanningRef.current = false; // Reset on new click
-      const originalMouseDown = worldScaleHandlers.handleMouseDown;
-      
-      const moveHandler = () => {
-          isPanningRef.current = true;
-          window.removeEventListener('mousemove', moveHandler);
-      };
-      window.addEventListener('mousemove', moveHandler, { once: true });
-      
-      originalMouseDown(e);
-  };
 
   const playerNode = gameState.nodes.find(n => n.type === 'player_consciousness');
   
@@ -177,7 +165,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
     <div
       className="simulation-container"
       onWheel={handleWheelForPower}
-      onMouseDown={handleMouseDown}
+      onMouseDown={worldScaleHandlers.handleMouseDown}
       onMouseUp={worldScaleHandlers.handleMouseUp}
       onMouseMove={(e) => {
         worldScaleHandlers.handleMouseMove(e);
@@ -229,8 +217,6 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
             />
           ))}
         </svg>
-
-        {renderProjectionUI()}
 
         {/* Render Connection Pulses */}
         {gameState.connectionParticles.map(particle => {
@@ -424,6 +410,8 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
         ))}
         
         {renderReformingParticles()}
+        
+        {renderProjectionUI()}
 
         {selectedNode && selectedNode.id !== playerNode?.id && (
             <RadialMenu node={selectedNode} dispatch={dispatch} onAsk={handleAsk} />

@@ -1,5 +1,4 @@
 
-
 import React, { useReducer, useState, useEffect, useCallback, useMemo } from 'react';
 import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, PlayerState, ProjectionState, CollectionBloom, CollectionFlare, WorldTransform } from '../types';
 import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS } from './constants';
@@ -598,7 +597,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { transform, handleWheel, handleMouseDown, handleMouseUp, handleMouseMove, screenToWorld: rawScreenToWorld } = useWorldScale();
+  const { transform, handleWheel, handleMouseDown, handleMouseUp, handleMouseMove, screenToWorld: rawScreenToWorld, zoom, isPanningRef } = useWorldScale();
   const screenToWorld = useCallback((x: number, y: number) => rawScreenToWorld(x, y, dimensions), [rawScreenToWorld, dimensions]);
 
   useGameLoop(dispatch, dimensions, gameState.isPaused, transform);
@@ -636,6 +635,7 @@ const App: React.FC = () => {
         transform={transform}
         worldScaleHandlers={{handleWheel, handleMouseDown, handleMouseUp, handleMouseMove}}
         screenToWorld={screenToWorld}
+        isPanningRef={isPanningRef}
       />
       
       <div className="hud-container">
@@ -666,9 +666,14 @@ const App: React.FC = () => {
           </div>
 
           <div className="hud-action-buttons">
-              <button onClick={() => dispatch({type: 'SET_PAUSED', payload: !gameState.isPaused})} className="action-button blue">PAUSE</button>
-              <button onClick={() => setSettingsModalOpen(true)} className="action-button purple">OPTIONS</button>
               <button onClick={() => setUpgradeModalOpen(true)} className="action-button">UPGRADES</button>
+              <button onClick={() => setSettingsModalOpen(true)} className="action-button purple">OPTIONS</button>
+              <button onClick={() => dispatch({type: 'SET_PAUSED', payload: !gameState.isPaused})} className="action-button blue">PAUSE</button>
+          </div>
+          
+          <div className="hud-zoom-controls">
+            <button onClick={() => zoom(1.2)} className="zoom-button" aria-label="Zoom In">+</button>
+            <button onClick={() => zoom(1 / 1.2)} className="zoom-button" aria-label="Zoom Out">-</button>
           </div>
       </div>
       

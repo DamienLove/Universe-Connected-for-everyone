@@ -693,7 +693,7 @@
     .hud-action-buttons {
       position: fixed;
       bottom: 1rem;
-      right: 1rem;
+      left: 1rem;
       display: flex;
       gap: 1rem;
       pointer-events: all;
@@ -724,6 +724,37 @@
     }
     .action-button.blue {
       background: linear-gradient(45deg, #3b82f6, #2563eb);
+    }
+
+    .hud-zoom-controls {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      pointer-events: all;
+    }
+    .zoom-button {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      line-height: 1;
+      font-weight: 300;
+      color: #ccfbf1;
+      cursor: pointer;
+      background: rgba(10, 15, 25, 0.6);
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      border-radius: 50%;
+      transition: all 0.2s ease;
+    }
+    .zoom-button:hover {
+        background: #14b8a6;
+        border-color: #0d9488;
+        transform: scale(1.1);
     }
 
 

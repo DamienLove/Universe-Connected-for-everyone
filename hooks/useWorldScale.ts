@@ -54,6 +54,13 @@ export const useWorldScale = (initialScale = 1.5) => {
     return { x: worldX, y: worldY };
   }, [transform]);
 
+  const zoom = useCallback((factor: number) => {
+    setTransform(prev => {
+      const newScale = prev.scale * factor;
+      return { ...prev, scale: Math.max(0.5, Math.min(newScale, 5)) };
+    });
+  }, []);
+
 
   return {
     transform,
@@ -63,5 +70,6 @@ export const useWorldScale = (initialScale = 1.5) => {
     handleMouseMove,
     isPanningRef: isPanning,
     screenToWorld,
+    zoom,
   };
 };

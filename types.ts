@@ -219,7 +219,6 @@ export interface TutorialStep {
   highlight: string;
 }
 
-// FIX: Added missing CrossroadsEvent interface definition.
 export interface CrossroadsEvent {
   id: string;
   title: string;

@@ -1,10 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-
-export interface WorldTransform {
-  x: number;
-  y: number;
-  scale: number;
-}
+import { WorldTransform } from '../types';
 
 export const useWorldScale = (initialScale = 1.5) => {
   const [transform, setTransform] = useState<WorldTransform>({ x: 0, y: 0, scale: initialScale });

@@ -1,21 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Upgrade, GameState } from '../types';
+import { Upgrade, GameState, NodeType } from '../types';
 import { getGeminiFlavorText, generateNodeImage } from '../services/geminiService';
+import { getNodeImagePrompt } from '../services/promptService';
 
 interface UpgradeCardProps {
   upgrade: Upgrade;
   gameState: GameState;
   onPurchase: (upgrade: Upgrade, imageUrl?: string) => void;
   isPurchaseable: (upgrade: Upgrade) => boolean;
-}
-
-const getNodeImagePrompt = (nodeType: 'star' | 'rocky_planet'): string => {
-    switch (nodeType) {
-        case 'star':
-            return "Clean vector art, a vibrant newborn star, glowing with yellow and orange plasma flares, simple bold shapes, against a deep space background, cel shaded, high contrast, 4k, HD, cinematic lighting.";
-        case 'rocky_planet':
-            return "Clean vector art of a barren, rocky exoplanet, shades of terracotta and grey, detailed with craters and canyons, simple bold shapes, against a deep space background with a distant nebula, cel shaded, high contrast, 4k, HD.";
-    }
 }
 
 const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchase, isPurchaseable }) => {
@@ -45,16 +37,19 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
     e.stopPropagation();
     if (!isPurchaseable(upgrade)) return;
 
-    if (upgrade.generatesNodeType) {
+    const nodeTypeToGenerate = upgrade.generatesNodeType || upgrade.modifiesNodeTypeTarget;
+
+    if (nodeTypeToGenerate) {
         setIsGeneratingImage(true);
         try {
-            const prompt = getNodeImagePrompt(upgrade.generatesNodeType);
-            const imageUrl = await generateNodeImage(prompt);
-            onPurchase(upgrade, imageUrl);
+            const prompt = getNodeImagePrompt(nodeTypeToGenerate);
+            const imageUrl = await generateNodeImage(prompt); // Returns string | null
+            // Pass imageUrl if it's a valid string, otherwise pass undefined.
+            onPurchase(upgrade, imageUrl ?? undefined);
         } catch (error) {
-            console.error("Failed to generate node image:", error);
-            // Purchase without an image as a fallback
-            onPurchase(upgrade);
+            // This catch is now for unexpected errors, not API failures.
+            console.error("An unexpected error occurred during the upgrade purchase process:", error);
+            onPurchase(upgrade); // Fallback to purchasing without an image
         } finally {
             setIsGeneratingImage(false);
         }

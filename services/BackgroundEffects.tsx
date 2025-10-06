@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { GameState } from '../types';
-import { useBackgroundEffects } from '../hooks/useBackgroundEffects';
+import { useBackgroundEffects } from './useBackgroundEffects';
 
 interface BackgroundEffectsProps {
   gameState: GameState;

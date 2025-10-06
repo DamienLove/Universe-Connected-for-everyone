@@ -1,6 +1,6 @@
 import React from 'react';
 import { Upgrade, GameState } from './types';
-import { UPGRADES } from './constants';
+import { UPGRADES } from './components/constants';
 import UpgradeCard from './components/UpgradeCard';
 
 interface UpgradeModalProps {
@@ -55,9 +55,19 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, gameState,
         return hasAllPrereqs;
     });
   }
+  
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    // If the click is on the backdrop itself and not a child element, close the modal.
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"
+      onClick={handleBackdropClick}
+    >
       <div className="bg-gray-900 border border-purple-500 rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-purple-300 glow-text">Knowledge Web</h2>

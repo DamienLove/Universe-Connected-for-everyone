@@ -81,7 +81,7 @@ export const getGeminiLoreForNode = async (node: GameNode, chapter: Chapter): Pr
     }
 };
 
-export const generateNodeImage = async (prompt: string): Promise<string> => {
+export const generateNodeImage = async (prompt: string): Promise<string | null> => {
     try {
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
@@ -97,10 +97,11 @@ export const generateNodeImage = async (prompt: string): Promise<string> => {
             const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
             return `data:image/png;base64,${base64ImageBytes}`;
         }
-        throw new Error("No image was generated.");
+        console.warn("The image generation API did not return an image. This might be due to safety filters or a transient issue.");
+        return null;
     } catch (error) {
         console.error(`Error generating image:`, error);
-        // In a real app, you might return a URL to a fallback placeholder image
-        throw error;
+        // Return null to allow for graceful fallback instead of throwing an error.
+        return null;
     }
 };

@@ -125,7 +125,6 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      cursor: none;
     }
     
     .world-container {
@@ -173,9 +172,8 @@
       margin-left: -50%;
       margin-top: -50%;
       pointer-events: all;
-      cursor: pointer;
       transform-origin: center center;
-      transition: transform 0.5s ease;
+      transition: transform 0.5s ease, opacity 0.5s ease;
     }
     
     .node-container.aim-assist-target::after {
@@ -376,17 +374,19 @@
     /* New Projection Mechanic UI */
     .aim-indicator {
       position: absolute;
-      height: 2px;
-      background: linear-gradient(90deg, rgba(0, 246, 255, 0.8), rgba(0, 246, 255, 0));
+      height: 3px;
+      background: linear-gradient(90deg, rgba(0, 246, 255, 1), rgba(0, 246, 255, 0));
       transform-origin: 0% 50%;
       pointer-events: none;
-      box-shadow: 0 0 8px rgba(0, 246, 255, 0.7);
-      margin-top: -1px; /* Center it */
-      transition: all 0.2s ease-out;
+      box-shadow: 0 0 10px rgba(0, 246, 255, 0.8);
+      margin-top: -1.5px; /* Center it */
+      transition: all 0.1s ease-out;
     }
     .aim-indicator.locked-on {
-        background: linear-gradient(90deg, #fef08a, rgba(0, 246, 255, 0));
-        box-shadow: 0 0 12px #fef08a;
+        background: linear-gradient(90deg, #fde047, rgba(253, 224, 71, 0));
+        box-shadow: 0 0 15px #fde047;
+        height: 4px;
+        margin-top: -2px;
     }
 
     #power-meter-container {
@@ -395,22 +395,29 @@
         pointer-events: none;
     }
     .power-meter-bg {
-        stroke: rgba(0, 246, 255, 0.2);
+        stroke: rgba(0, 246, 255, 0.15);
     }
     .power-meter-fg {
         stroke: #00f6ff;
         stroke-linecap: round;
+        filter: drop-shadow(0 0 4px #00f6ff);
+        transition: stroke-dashoffset 0.1s linear;
+    }
+    .power-meter-text {
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-shadow: 0 0 5px #000;
     }
     
-    .projectile-trail {
+    .projectile-trail-particle {
         position: absolute;
-        width: 4px;
-        height: 80px;
-        background: linear-gradient(to top, transparent, rgba(0, 246, 255, 0.7));
-        border-radius: 2px;
-        transform-origin: 50% 100%;
-        margin-left: -2px;
-        margin-top: -80px;
+        width: 8px;
+        height: 8px;
+        background: radial-gradient(circle, #ccfbf1, #00f6ff 50%, transparent 100%);
+        border-radius: 50%;
+        margin-left: -4px;
+        margin-top: -4px;
+        pointer-events: none;
     }
 
     .reforming-particle {
@@ -611,12 +618,13 @@
       z-index: 20;
     }
     .hud-element {
-      background: rgba(10, 15, 25, 0.6);
-      border: 1px solid rgba(0, 246, 255, 0.2);
-      backdrop-filter: blur(4px);
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
-      box-shadow: 0 0 15px rgba(0, 246, 255, 0.1);
+      background: linear-gradient(135deg, rgba(10, 15, 25, 0.7), rgba(20, 25, 40, 0.6));
+      border: 1px solid transparent;
+      border-image: linear-gradient(to bottom right, rgba(0, 246, 255, 0.4), rgba(0, 246, 255, 0.1)) 1;
+      backdrop-filter: blur(6px);
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0, 246, 255, 0.1), inset 0 0 15px rgba(0, 246, 255, 0.05);
     }
 
     .hud-top-bar {
@@ -637,20 +645,35 @@
     .hud-resources {
       display: flex;
       flex-direction: row;
-      gap: 1rem;
-      flex-wrap: wrap; /* Allow wrapping on small screens */
+      gap: 1.5rem;
+      flex-wrap: wrap;
     }
     .hud-resource-item {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      font-size: 1.1rem;
-      font-weight: 500;
+      gap: 0.75rem;
+      font-size: 1.25rem;
+      font-weight: 600;
       color: #e0f2fe;
+      text-shadow: 0 0 3px rgba(0,0,0,0.5);
+      transition: transform 0.3s ease-out, color 0.3s ease-out, text-shadow 0.3s ease-out;
     }
     .hud-resource-item svg {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
+      filter: drop-shadow(0 0 4px currentColor);
+    }
+    .resource-pulse {
+      animation: pulse-resource 0.5s ease-out;
+    }
+    @keyframes pulse-resource {
+      0% { transform: scale(1); }
+      50% { 
+        transform: scale(1.15); 
+        color: #ffffff; 
+        text-shadow: 0 0 12px #fff, 0 0 5px rgba(0,0,0,0.5); 
+      }
+      100% { transform: scale(1); }
     }
     
     .hud-top-center {
@@ -669,33 +692,63 @@
 
     .hud-chapter-info {
       text-align: center;
-      color: #93c5fd;
+      color: #bae6fd;
     }
     .hud-chapter-info h2 {
-      font-size: 1.25rem;
-      font-weight: bold;
+      font-size: 1.4rem;
+      font-weight: 700;
       color: #e0f2fe;
-      text-shadow: 0 0 5px #00f6ff;
+      text-shadow: 0 0 8px #00f6ff;
+    }
+    
+    .hud-chapter-objective {
+        font-size: 1.1rem;
+        color: #fef08a;
+        font-weight: 500;
+        text-shadow: 0 0 8px #fef08a;
+        margin-top: 0.25rem;
+        height: 1.5rem; /* Reserve space */
+        text-align: center;
+        animation: pulse-objective 5s infinite ease-in-out;
+    }
+    @keyframes pulse-objective {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
     }
 
     .hud-chapter-progress-bar {
-      width: clamp(250px, 30vw, 400px);
-      height: 8px;
-      background: rgba(0, 246, 255, 0.15);
+      width: clamp(300px, 30vw, 450px);
+      height: 12px;
+      background: rgba(0, 246, 255, 0.1);
       border: 1px solid rgba(0, 246, 255, 0.2);
-      border-radius: 4px;
-      overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+      border-radius: 6px;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .hud-chapter-progress-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
       height: 100%;
-      background: #00f6ff;
-      box-shadow: 0 0 8px #00f6ff;
+      background: linear-gradient(90deg, #00f6ff, #67e8f9);
+      box-shadow: 0 0 10px #00f6ff, inset 0 0 5px rgba(255,255,255,0.5);
       transition: width 0.5s ease-out;
+    }
+    .chapter-progress-text {
+        position: relative;
+        z-index: 1;
+        color: #0c4a6e;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
     }
     
     .hud-karma-meter {
-      width: clamp(250px, 30vw, 400px);
+      width: clamp(300px, 30vw, 450px);
+      margin-top: 0.5rem;
     }
     .karma-labels {
       display: flex;
@@ -704,8 +757,8 @@
       margin-bottom: 0.25rem;
       padding: 0 2px;
     }
-    .karma-label-chaos { color: #f472b6; }
-    .karma-label-harmony { color: #22d3ee; }
+    .karma-label-chaos { color: #f472b6; text-shadow: 0 0 5px #f472b6; }
+    .karma-label-harmony { color: #22d3ee; text-shadow: 0 0 5px #22d3ee; }
 
     .karma-bar-bg {
       height: 6px;
@@ -726,13 +779,19 @@
       box-shadow: 0 0 5px white;
     }
 
-    .hud-action-buttons {
+    .hud-bottom-right-container {
       position: absolute;
       bottom: 1rem;
-      left: 1rem;
+      right: 1rem;
       display: flex;
+      align-items: flex-end;
       gap: 1rem;
       pointer-events: all;
+    }
+
+    .hud-action-buttons {
+      display: flex;
+      gap: 1rem;
     }
     .action-button {
       width: 120px;
@@ -749,27 +808,35 @@
       background: linear-gradient(45deg, #14b8a6, #0d9488);
       clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%);
       transition: all 0.2s ease;
+      border: 1px solid #14b8a6;
+      box-shadow: 0 0 10px rgba(20, 184, 166, 0.4), inset 0 0 5px rgba(255,255,255,0.1);
     }
     .action-button:hover {
         transform: scale(1.05);
         color: white;
         text-shadow: 0 0 8px white;
+        box-shadow: 0 0 15px rgba(20, 184, 166, 0.7), inset 0 0 8px rgba(255,255,255,0.2);
+    }
+    .action-button:active {
+        transform: scale(1.02);
     }
     .action-button.purple {
       background: linear-gradient(45deg, #a855f7, #7e22ce);
+      border-color: #a855f7;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.4), inset 0 0 5px rgba(255,255,255,0.1);
     }
+     .action-button.purple:hover { box-shadow: 0 0 15px rgba(168, 85, 247, 0.7), inset 0 0 8px rgba(255,255,255,0.2); }
     .action-button.blue {
       background: linear-gradient(45deg, #3b82f6, #2563eb);
+      border-color: #3b82f6;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.4), inset 0 0 5px rgba(255,255,255,0.1);
     }
+    .action-button.blue:hover { box-shadow: 0 0 15px rgba(59, 130, 246, 0.7), inset 0 0 8px rgba(255,255,255,0.2); }
 
     .hud-zoom-controls {
-      position: absolute;
-      bottom: 1rem;
-      right: 1rem;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
-      pointer-events: all;
     }
     .zoom-button {
       width: 48px;
@@ -782,15 +849,53 @@
       font-weight: 300;
       color: #ccfbf1;
       cursor: pointer;
-      background: rgba(10, 15, 25, 0.6);
-      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(10, 15, 25, 0.7);
+      border: 1px solid rgba(0, 246, 255, 0.3);
       border-radius: 50%;
       transition: all 0.2s ease;
+      box-shadow: 0 0 8px rgba(0, 246, 255, 0.2);
     }
     .zoom-button:hover {
         background: #14b8a6;
-        border-color: #0d9488;
+        border-color: #ccfbf1;
         transform: scale(1.1);
+        color: white;
+        box-shadow: 0 0 12px rgba(20, 184, 166, 0.6);
+    }
+    .zoom-button:active {
+        transform: scale(1.05);
+    }
+
+    /* Inventory Bar */
+    .hud-inventory-bar {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: linear-gradient(135deg, rgba(10, 15, 25, 0.7), rgba(20, 25, 40, 0.6));
+      border: 1px solid transparent;
+      border-image: linear-gradient(to bottom right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.1)) 1;
+      border-radius: 8px;
+    }
+    .inventory-item {
+      width: 52px;
+      height: 52px;
+      border-radius: 6px;
+      border: 2px solid rgba(13, 148, 136, 0.6);
+      background-color: rgba(13, 148, 136, 0.3);
+      background-size: 70%;
+      background-position: center;
+      background-repeat: no-repeat;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: inset 0 0 8px rgba(20, 184, 166, 0.4);
+    }
+    .inventory-item:hover {
+      transform: scale(1.1);
+      border-color: #14b8a6;
+      box-shadow: 0 0 10px #14b8a6, inset 0 0 10px rgba(20, 184, 166, 0.6);
+    }
+    .icon-stabilizer {
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ccfbf1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>');
     }
 
 
@@ -844,6 +949,42 @@
       opacity: 0;
       animation: fadeInSlow 2s 1s forwards;
     }
+    .milestone-skip-button {
+      position: absolute;
+      bottom: 2rem;
+      right: 2rem;
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid rgba(139, 92, 246, 0.5);
+      backdrop-filter: blur(4px);
+      color: #e0e7ff;
+      padding: 0.5rem 1.5rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 20;
+      opacity: 0;
+      animation: fadeInSlow 1s 1.5s forwards; /* Fade in after a delay */
+      transition: all 0.2s ease;
+      pointer-events: all;
+    }
+    .milestone-skip-button:hover {
+      background: rgba(79, 70, 229, 0.5);
+      border-color: rgba(167, 139, 250, 0.8);
+      transform: scale(1.05);
+    }
+    .milestone-explosion-flash {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle, white 5%, rgba(255, 255, 255, 0) 60%);
+        animation: milestone-flash-anim 1s ease-out forwards;
+        z-index: 5;
+    }
+    @keyframes milestone-flash-anim {
+        from { transform: scale(0.1); opacity: 1; }
+        to { transform: scale(3); opacity: 0; }
+    }
+
 
     @keyframes fadeInMilestone { from { opacity: 0; } to { opacity: 1; } }
     @keyframes fadeOutMilestone { from { opacity: 1; } to { opacity: 0; } }
@@ -905,6 +1046,14 @@
     }
 
     /* Star Formation Animation */
+    .star-formation-container {
+        position: relative;
+        width: 80vmin;
+        height: 80vmin;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
     .gas-cloud {
         width: 80vmin;
         height: 80vmin;
@@ -916,8 +1065,34 @@
     @keyframes swirl-condense-ignite {
         0% { transform: scale(1.5) rotate(0deg); opacity: 0.8; filter: blur(40px); }
         70% { transform: scale(0.1) rotate(540deg); opacity: 1; filter: blur(10px); background: radial-gradient(circle, #fff, #ffcc00, transparent 50%);}
-        85% { transform: scale(1.2); filter: blur(0); background: radial-gradient(circle, #fff, #ffcc00, transparent 40%); box-shadow: 0 0 50px #ffcc00; }
-        100% { transform: scale(1); filter: blur(0); background: radial-gradient(circle, #fff, #ffcc00, transparent 40%); box-shadow: 0 0 40px #ffcc00;}
+        100% { transform: scale(0); opacity: 0; filter: blur(10px); }
+    }
+    .formed-star {
+        width: 20vmin;
+        height: 20vmin;
+        object-fit: cover;
+        border-radius: 50%;
+        opacity: 0;
+        animation: star-ignite 4s 3s forwards;
+        filter: drop-shadow(0 0 30px #ffcc00);
+        position: absolute;
+    }
+    @keyframes star-ignite {
+        0% { transform: scale(0.1); opacity: 0; }
+        50% { transform: scale(1.5); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .star-shockwave {
+        position: absolute;
+        inset: 20vmin;
+        border-radius: 50%;
+        border: 5px solid #ffcc00;
+        opacity: 0;
+        animation: star-shockwave-anim 2s 3.5s ease-out forwards;
+    }
+    @keyframes star-shockwave-anim {
+        from { transform: scale(0.1); opacity: 1; }
+        to { transform: scale(1.5); opacity: 0; }
     }
 
     /* Planetary Accretion Animation */

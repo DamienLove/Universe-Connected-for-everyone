@@ -747,7 +747,7 @@ const App: React.FC = () => {
     prevResources.current = { energy: gameState.energy, knowledge: gameState.knowledge };
   }, [gameState.energy, gameState.knowledge]);
 
-  const { transform, handleWheel, handleMouseDown, handleMouseUp, handleMouseMove, screenToWorld: rawScreenToWorld, zoom, isPanningRef } = useWorldScale();
+  const { transform, handleWheel, handleMouseDown, handleMouseUp, handleMouseMove, screenToWorld: rawScreenToWorld, zoom, isPanningRef } = useWorldScale(0.8);
   const screenToWorld = useCallback((x: number, y: number) => rawScreenToWorld(x, y, dimensions), [rawScreenToWorld, dimensions]);
 
   useGameLoop(dispatch, dimensions, gameState.isPaused, transform);

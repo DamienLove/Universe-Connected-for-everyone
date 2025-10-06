@@ -13,6 +13,7 @@ import SplashScreen from './components/SplashScreen';
 import KarmaParticles from './hooks/KarmaParticles';
 import BackgroundEffects from './services/BackgroundEffects';
 import CrossroadsModal from './CrossroadsModal';
+import DevPanel from './components/DevPanel';
 
 // Constants for game balance
 const BASE_KNOWLEDGE_RATE = 0.1;
@@ -424,6 +425,7 @@ const formatResource = (num: number) => {
 function App() {
   const [gameState, dispatch] = useReducer(gameReducer, initialState);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [mouseWorldPos, setMouseWorldPos] = useState({ x: 0, y: 0 });
 
@@ -496,7 +498,16 @@ function App() {
         Knowledge Web
       </button>
 
+      <button
+        id="dev-panel-button"
+        className="absolute bottom-4 right-4 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-5 rounded-lg shadow-lg z-20"
+        onClick={() => setIsDevPanelOpen(true)}
+      >
+        Dev Panel
+      </button>
+
       {/* Modals & Overlays */}
+      {isDevPanelOpen && <DevPanel onClose={() => setIsDevPanelOpen(false)} />}
       <UpgradeModal
         isOpen={isUpgradeModalOpen}
         onClose={() => setIsUpgradeModalOpen(false)}

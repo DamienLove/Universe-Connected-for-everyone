@@ -3,20 +3,20 @@ class AudioService {
   private soundBuffers: { [key: string]: AudioBuffer } = {};
   private backgroundMusicSource: AudioBufferSourceNode | null = null;
 
-  // A map of sound IDs to load as silent placeholders.
+  // A map of sound IDs to their corresponding file paths.
   private soundPaths: { [key: string]: string } = {
-    background: '',
-    purchase_upgrade: '',
-    milestone_achievement: '',
-    collect_orb: '',
-    connect_success: '',
-    node_bounce: '',
-    connection_bounce: '',
-    phage_spawn: '',
-    phage_drain: '',
-    phage_capture: '',
-    ui_click: '',
-    ui_open: '',
+    background: '/audio/background.mp3',
+    purchase_upgrade: '/audio/purchase_upgrade.wav',
+    milestone_achievement: '/audio/milestone_achievement.wav',
+    collect_orb: '/audio/collect_orb.wav',
+    connect_success: '/audio/connect_success.wav',
+    node_bounce: '/audio/node_bounce.wav',
+    connection_bounce: '/audio/connection_bounce.wav',
+    phage_spawn: '/audio/phage_spawn.wav',
+    phage_drain: '/audio/phage_drain.wav',
+    phage_capture: '/audio/phage_capture.wav',
+    ui_click: '/audio/ui_click.wav',
+    ui_open: '/audio/ui_open.wav',
   };
 
   constructor() {
@@ -33,21 +33,45 @@ class AudioService {
     }
   }
 
-  private async loadSound(id: string): Promise<void> {
-    if (!this.audioContext || this.soundBuffers[id]) return;
+  private async loadSound(id: string, path: string): Promise<void> {
+    if (!this.audioContext || !path) return;
     try {
-      // The original base64 strings for sounds were invalid or empty, causing decode errors.
-      // This approach creates a valid, silent, single-sample buffer programmatically
-      // to act as a placeholder. This resolves the console errors while keeping the audio system functional.
-      const buffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate);
-      this.soundBuffers[id] = buffer;
+      const response = await fetch(path);
+      if (!response.ok) {
+        throw new Error(`Audio file not found: ${path}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      this.soundBuffers[id] = audioBuffer;
     } catch (error) {
-      console.error(`Failed to create silent buffer for sound: ${id}`, error);
+      // If loading fails, create a silent placeholder buffer to prevent app crash.
+      console.warn(`Failed to load sound '${id}' from '${path}'. Using silent placeholder.`, error);
+      if (this.audioContext) {
+        const buffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate);
+        this.soundBuffers[id] = buffer;
+      }
     }
   }
 
+  public async loadSoundFromBlob(id: string, blob: Blob): Promise<void> {
+    if (!this.audioContext) return;
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        this.soundBuffers[id] = audioBuffer;
+        console.log(`Successfully loaded sound from blob for ID: ${id}`);
+    } catch (error) {
+        console.error(`Failed to load sound from blob for ID: ${id}`, error);
+    }
+  }
+
+  public overrideSound(id: string, newBuffer: AudioBuffer): void {
+    if (!this.audioContext) return;
+    this.soundBuffers[id] = newBuffer;
+  }
+
   private async loadAllSounds(): Promise<void> {
-    const soundPromises = Object.keys(this.soundPaths).map((id) => this.loadSound(id));
+    const soundPromises = Object.entries(this.soundPaths).map(([id, path]) => this.loadSound(id, path));
     await Promise.all(soundPromises);
   }
 
@@ -62,11 +86,8 @@ class AudioService {
   }
 
   public playSound(id: string, volume = 1): void {
-    if (!this.audioContext || !this.soundBuffers[id]) return;
-
-    // A buffer with a length of 1 sample is our silent placeholder; don't attempt to play it.
-    if (this.soundBuffers[id].length <= 1) {
-      return;
+    if (!this.audioContext || !this.soundBuffers[id] || this.soundBuffers[id].length <= 1) {
+        return; // Do not play silent placeholders
     }
 
     const source = this.audioContext.createBufferSource();
@@ -81,22 +102,17 @@ class AudioService {
   }
 
   public playBackgroundMusic(volume = 0.3): void {
-    if (!this.audioContext || !this.soundBuffers.background) return;
+    if (!this.audioContext || !this.soundBuffers.background || this.soundBuffers.background.length <= 1) {
+        return; // Do not play silent placeholders
+    }
 
     if (this.backgroundMusicSource) {
       this.backgroundMusicSource.stop();
     }
     
-    // A buffer with a length of 1 sample is our silent placeholder; don't attempt to play it.
-    if (this.soundBuffers.background.length <= 1) {
-        return;
-    }
-
     this.backgroundMusicSource = this.audioContext.createBufferSource();
     this.backgroundMusicSource.buffer = this.soundBuffers.background;
-    
-    // As requested, do not loop the music.
-    this.backgroundMusicSource.loop = false;
+    this.backgroundMusicSource.loop = true;
 
     const gainNode = this.audioContext.createGain();
     gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);

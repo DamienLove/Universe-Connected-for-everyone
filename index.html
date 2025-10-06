@@ -125,7 +125,6 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      cursor: none;
     }
     
     .world-container {
@@ -173,9 +172,8 @@
       margin-left: -50%;
       margin-top: -50%;
       pointer-events: all;
-      cursor: pointer;
       transform-origin: center center;
-      transition: transform 0.5s ease;
+      transition: transform 0.5s ease, opacity 0.5s ease;
     }
     
     .node-container.aim-assist-target::after {
@@ -284,6 +282,11 @@
       20%, 40%, 60%, 80% { filter: hue-rotate(-10deg) brightness(0.9) drop-shadow(0 0 2px #a855f7); }
     }
 
+    /* Black Hole Distortion Effect */
+    .node-warping {
+      filter: url(#black-hole-warp);
+    }
+
 
     .node-placeholder {
         width: 100%;
@@ -369,7 +372,7 @@
     }
     
     /* New Projection Mechanic UI */
-    .aim-indicator {
+    #aim-indicator {
       position: absolute;
       height: 2px;
       background: linear-gradient(90deg, rgba(0, 246, 255, 0.8), rgba(0, 246, 255, 0));
@@ -377,11 +380,6 @@
       pointer-events: none;
       box-shadow: 0 0 8px rgba(0, 246, 255, 0.7);
       margin-top: -1px; /* Center it */
-      transition: all 0.2s ease-out;
-    }
-    .aim-indicator.locked-on {
-        background: linear-gradient(90deg, #fef08a, rgba(0, 246, 255, 0));
-        box-shadow: 0 0 12px #fef08a;
     }
 
     #power-meter-container {
@@ -389,16 +387,8 @@
         transform: translate(-50%, -50%);
         pointer-events: none;
     }
-    .power-meter-bg {
-        stroke: rgba(0, 246, 255, 0.2);
-    }
-    .power-meter-fg {
-        stroke: #00f6ff;
-        stroke-linecap: round;
-        transition: stroke-dashoffset 0.05s linear;
-    }
     
-    .projectile-trail {
+    #projectile-trail {
         position: absolute;
         width: 4px;
         height: 80px;
@@ -543,6 +533,28 @@
         to { transform: scale(1.2); opacity: 0; }
     }
 
+    /* Black Hole Styling */
+    .black-hole-core {
+        position: absolute;
+        border-radius: 50%;
+        background: #000;
+        box-shadow: 0 0 10px #000, 0 0 20px #000;
+        margin-left: -50%;
+        margin-top: -50%;
+    }
+    .black-hole-accretion-disk {
+        position: absolute;
+        border-radius: 50%;
+        border: 4px solid transparent;
+        border-top-color: #f97316; /* Orange */
+        border-right-color: #fde047; /* Yellow */
+        animation: spin 3s linear infinite;
+        box-shadow: 0 0 20px #f97316;
+        margin-left: -50%;
+        margin-top: -50%;
+        transform: rotateX(75deg);
+    }
+
 
     .resource-bloom {
         position: absolute;
@@ -556,6 +568,12 @@
     }
 
     /* Screen Shake & Colorblind Filters */
+    .app-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
     .app-container.shaking {
       animation: screen-shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
     }
@@ -596,6 +614,10 @@
         justify-content: space-between;
         align-items: flex-start;
         gap: 1rem;
+        pointer-events: none; /* Let clicks pass through empty areas */
+    }
+    .hud-top-bar > * {
+        pointer-events: all; /* Make direct children clickable */
     }
     
     .hud-resources {
@@ -615,6 +637,14 @@
     .hud-resource-item svg {
       width: 24px;
       height: 24px;
+    }
+    .resource-pulse {
+      animation: pulse-resource 0.5s ease-out;
+    }
+    @keyframes pulse-resource {
+      0% { transform: scale(1); color: #e0f2fe; text-shadow: none; }
+      50% { transform: scale(1.2); color: #ffffff; text-shadow: 0 0 8px #fff; }
+      100% { transform: scale(1); color: #e0f2fe; text-shadow: none; }
     }
     
     .hud-top-center {
@@ -650,12 +680,32 @@
       border-radius: 4px;
       overflow: hidden;
       box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+      position: relative; /* To position the text inside */
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .hud-chapter-progress-fill {
       height: 100%;
       background: #00f6ff;
       box-shadow: 0 0 8px #00f6ff;
       transition: width 0.5s ease-out;
+    }
+    .chapter-progress-text {
+        position: absolute;
+        color: #000;
+        font-size: 0.6rem;
+        font-weight: bold;
+        text-shadow: 0 0 2px rgba(255, 255, 255, 0.7);
+        mix-blend-mode: overlay;
+    }
+    .hud-chapter-objective {
+        font-size: 0.9rem;
+        color: #fde047; /* Yellow to stand out */
+        text-shadow: 0 0 5px #fde047;
+        margin-top: 0.25rem;
+        height: 1.25rem; /* Reserve space to prevent layout shift */
+        text-align: center;
     }
     
     .hud-karma-meter {
@@ -693,7 +743,7 @@
     .hud-action-buttons {
       position: absolute;
       bottom: 1rem;
-      right: 1rem;
+      left: 1rem;
       display: flex;
       gap: 1rem;
       pointer-events: all;
@@ -724,6 +774,37 @@
     }
     .action-button.blue {
       background: linear-gradient(45deg, #3b82f6, #2563eb);
+    }
+
+    .hud-zoom-controls {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      pointer-events: all;
+    }
+    .zoom-button {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      line-height: 1;
+      font-weight: 300;
+      color: #ccfbf1;
+      cursor: pointer;
+      background: rgba(10, 15, 25, 0.6);
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      border-radius: 50%;
+      transition: all 0.2s ease;
+    }
+    .zoom-button:hover {
+        background: #14b8a6;
+        border-color: #0d9488;
+        transform: scale(1.1);
     }
 
 
@@ -777,6 +858,42 @@
       opacity: 0;
       animation: fadeInSlow 2s 1s forwards;
     }
+    .milestone-skip-button {
+      position: absolute;
+      bottom: 2rem;
+      right: 2rem;
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid rgba(139, 92, 246, 0.5);
+      backdrop-filter: blur(4px);
+      color: #e0e7ff;
+      padding: 0.5rem 1.5rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 20;
+      opacity: 0;
+      animation: fadeInSlow 1s 1.5s forwards; /* Fade in after a delay */
+      transition: all 0.2s ease;
+      pointer-events: all;
+    }
+    .milestone-skip-button:hover {
+      background: rgba(79, 70, 229, 0.5);
+      border-color: rgba(167, 139, 250, 0.8);
+      transform: scale(1.05);
+    }
+    .milestone-explosion-flash {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle, white 5%, rgba(255, 255, 255, 0) 60%);
+        animation: milestone-flash-anim 1s ease-out forwards;
+        z-index: 5;
+    }
+    @keyframes milestone-flash-anim {
+        from { transform: scale(0.1); opacity: 1; }
+        to { transform: scale(3); opacity: 0; }
+    }
+
 
     @keyframes fadeInMilestone { from { opacity: 0; } to { opacity: 1; } }
     @keyframes fadeOutMilestone { from { opacity: 1; } to { opacity: 0; } }
@@ -838,6 +955,14 @@
     }
 
     /* Star Formation Animation */
+    .star-formation-container {
+        position: relative;
+        width: 80vmin;
+        height: 80vmin;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
     .gas-cloud {
         width: 80vmin;
         height: 80vmin;
@@ -849,8 +974,34 @@
     @keyframes swirl-condense-ignite {
         0% { transform: scale(1.5) rotate(0deg); opacity: 0.8; filter: blur(40px); }
         70% { transform: scale(0.1) rotate(540deg); opacity: 1; filter: blur(10px); background: radial-gradient(circle, #fff, #ffcc00, transparent 50%);}
-        85% { transform: scale(1.2); filter: blur(0); background: radial-gradient(circle, #fff, #ffcc00, transparent 40%); box-shadow: 0 0 50px #ffcc00; }
-        100% { transform: scale(1); filter: blur(0); background: radial-gradient(circle, #fff, #ffcc00, transparent 40%); box-shadow: 0 0 40px #ffcc00;}
+        100% { transform: scale(0); opacity: 0; filter: blur(10px); }
+    }
+    .formed-star {
+        width: 20vmin;
+        height: 20vmin;
+        object-fit: cover;
+        border-radius: 50%;
+        opacity: 0;
+        animation: star-ignite 4s 3s forwards;
+        filter: drop-shadow(0 0 30px #ffcc00);
+        position: absolute;
+    }
+    @keyframes star-ignite {
+        0% { transform: scale(0.1); opacity: 0; }
+        50% { transform: scale(1.5); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .star-shockwave {
+        position: absolute;
+        inset: 20vmin;
+        border-radius: 50%;
+        border: 5px solid #ffcc00;
+        opacity: 0;
+        animation: star-shockwave-anim 2s 3.5s ease-out forwards;
+    }
+    @keyframes star-shockwave-anim {
+        from { transform: scale(0.1); opacity: 1; }
+        to { transform: scale(1.5); opacity: 0; }
     }
 
     /* Planetary Accretion Animation */
@@ -1264,6 +1415,16 @@
 </head>
 <body>
   <div id="root"></div>
+  <svg style="position: absolute; width: 0; height: 0; overflow: hidden">
+    <defs>
+      <filter id="black-hole-warp">
+        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" result="turbulence">
+          <animate attributeName="baseFrequency" dur="1.5s" keyTimes="0;0.5;1" values="0.05;0.06;0.05" repeatCount="indefinite" />
+        </feTurbulence>
+        <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="15" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
   <script type="importmap">
   {
     "imports": {

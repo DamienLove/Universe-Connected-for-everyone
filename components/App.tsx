@@ -1,12 +1,9 @@
-
-
-import React, { useReducer, useState, useEffect, useCallback, useMemo } from 'react';
-import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, PlayerState, ProjectionState, CollectionBloom, CollectionFlare, WorldTransform } from '../types';
-import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS } from './constants';
+import React, { useReducer, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, WorldTransform, ProjectionState } from '../types';
+import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS, NODE_IMAGE_MAP } from './constants';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { audioService } from '../services/AudioService';
-import { getNodeImagePrompt } from '../services/promptService';
-import { generateNodeImage, getGeminiLoreForNode } from '../services/geminiService';
+import { getGeminiLoreForNode } from '../services/geminiService';
 import { useWorldScale } from '../hooks/useWorldScale';
 
 import Simulation from './Simulation';
@@ -45,12 +42,12 @@ const BLACK_HOLE_SPAWN_CHANCE = 0.00005;
 const BLACK_HOLE_DURATION_TICKS = 3600; // 1 minute
 const BLACK_HOLE_PULL_STRENGTH = 100;
 
-const PLAYER_PROJECTION_MAX_SPEED = 20;
-const PLAYER_PROJECTION_MIN_SPEED = 4;
-const PLAYER_REFORM_TIME = 120; // 2 seconds
-const PLAYER_PROJECTION_LIFESPAN = 300; // 5 seconds
-const STAR_GRAVITY_CONSTANT = 0.5;
-const PLANET_GRAVITY_CONSTANT = 0.1;
+const AIM_ROTATION_SPEED = 0.01; // Radians per tick
+const POWER_OSCILLATION_SPEED = 1.5; // From 0 to 100
+const MAX_LAUNCH_POWER = 20;
+const PROJECTILE_FRICTION = 0.98;
+const REFORM_DURATION = 120; // 2 seconds
+
 const ORB_COLLECTION_LEEWAY = 10; // Extra radius for easier collection
 
 const TUNNEL_CHANCE_PER_TICK = 0.0005;
@@ -58,6 +55,13 @@ const TUNNEL_DISTANCE = 400;
 const TUNNEL_DURATION_TICKS = 60; // 1 second
 
 const SAVE_GAME_KEY = 'universe-connected-save';
+
+const initialProjectionState: ProjectionState = {
+  playerState: 'IDLE',
+  aimAngle: 0,
+  power: 0,
+  reformTimer: 0,
+};
 
 const initialState: GameState = {
   gameStarted: false,
@@ -89,8 +93,6 @@ const initialState: GameState = {
       radius: 20,
       connections: [],
       hasLife: false,
-      playerState: 'IDLE',
-      reformTimer: 0,
     },
     {
       id: 'tutorial_planet',
@@ -109,13 +111,7 @@ const initialState: GameState = {
   cosmicEvents: [],
   notifications: [],
   connectMode: { active: false, sourceNodeId: null },
-  projectionState: {
-      phase: 'inactive',
-      angle: -Math.PI / 2, // Start pointing up
-      power: 0,
-      launchPosition: { x: 0, y: 0 },
-      powerDirection: 1,
-  },
+  projection: initialProjectionState,
   connectionParticles: [],
   energyOrbs: [],
   collectionEffects: [],
@@ -161,6 +157,37 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let nextState = { ...state };
       const { width, height, transform } = action.payload;
       const worldRadius = (Math.min(width, height) * 1.5) / (state.zoomLevel + 1);
+
+      // --- PROJECTION STATE MACHINE ---
+      let playerNode = nextState.nodes.find(n => n.type === 'player_consciousness');
+      if (playerNode) {
+          switch (nextState.projection.playerState) {
+            case 'AIMING_DIRECTION':
+              nextState.projection.aimAngle += AIM_ROTATION_SPEED;
+              break;
+            case 'AIMING_POWER':
+              // Oscillate power between 0 and 100
+              nextState.projection.power = (Math.sin(Date.now() / (1000 / POWER_OSCILLATION_SPEED)) + 1) * 50;
+              break;
+            case 'PROJECTING':
+              if (Math.hypot(playerNode.vx, playerNode.vy) < 0.1) {
+                  playerNode.vx = 0;
+                  playerNode.vy = 0;
+                  nextState.projection.playerState = 'REFORMING';
+                  nextState.projection.reformTimer = REFORM_DURATION;
+              }
+              break;
+            case 'REFORMING':
+              nextState.projection.reformTimer--;
+              if (nextState.projection.reformTimer <= 0) {
+                nextState.projection.playerState = 'IDLE';
+                // Reset player position to center
+                playerNode.x = 0;
+                playerNode.y = 0;
+              }
+              break;
+          }
+      }
 
       // --- KARMA & GLOBAL MODIFIERS ---
       let harmonyBonus = 1.0;
@@ -306,22 +333,28 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }).filter(event => event.duration > 0);
       nextState.cosmicEvents = nextCosmicEvents;
 
-      // --- NODE PHYSICS ---
+      // --- NODE PHYSICS & PLAYER LOGIC ---
+      playerNode = mutableNodes.find(n => n.type === 'player_consciousness');
+      
       mutableNodes.forEach(node => {
-        // Gravity from stars and planets
-        mutableNodes.forEach(otherNode => {
-          if (node.id === otherNode.id || node.type === 'player_consciousness') return;
-          const dx = otherNode.x - node.x;
-          const dy = otherNode.y - node.y;
-          const distSq = dx * dx + dy * dy;
-          if (distSq > 1) {
-            const dist = Math.sqrt(distSq);
-            const force = (otherNode.type === 'star' ? STAR_GRAVITY_CONSTANT : PLANET_GRAVITY_CONSTANT) * otherNode.radius / distSq;
-            node.vx += (dx / dist) * force;
-            node.vy += (dy / dist) * force;
-          }
-        });
-
+        // Player is only moved by projectile physics
+        if (node.type !== 'player_consciousness') {
+            // Gravity from stars and planets for non-player nodes
+            mutableNodes.forEach(otherNode => {
+              if (node.id === otherNode.id) return;
+              const dx = otherNode.x - node.x;
+              const dy = otherNode.y - node.y;
+              const distSq = dx * dx + dy * dy;
+              if (distSq > 1) {
+                const dist = Math.sqrt(distSq);
+                const force = (otherNode.type === 'star' ? 0.5 : 0.1) * otherNode.radius / distSq;
+                node.vx += (dx / dist) * force;
+                node.vy += (dy / dist) * force;
+              }
+            });
+        }
+        
+        // Common physics for all nodes
         // Pull from cosmic events
         nextState.cosmicEvents.forEach(event => {
             const dx = (event.x || 0) - node.x;
@@ -351,8 +384,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         
         node.x += node.vx;
         node.y += node.vy;
-        node.vx *= 0.99;
-        node.vy *= 0.99;
+
+        // Apply friction/drag
+        const friction = node.type === 'player_consciousness' ? PROJECTILE_FRICTION : 0.99;
+        node.vx *= friction;
+        node.vy *= friction;
         
         // Boundary collision
         const distFromCenter = Math.sqrt(node.x * node.x + node.y * node.y);
@@ -367,18 +403,30 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         // Star orb spawning
         if (node.type === 'star' && Math.random() < STAR_ORB_SPAWN_CHANCE) {
-            const angle = Math.random() * 2 * Math.PI;
-            const dist = node.radius + 10;
             newEnergyOrbs.push({
                 id: `orb_${Date.now()}_${Math.random()}`,
-                x: node.x + Math.cos(angle) * dist,
-                y: node.y + Math.sin(angle) * dist,
+                x: node.x + (Math.random() - 0.5) * node.radius,
+                y: node.y + (Math.random() - 0.5) * node.radius,
                 vx: (Math.random() - 0.5) * 1,
                 vy: (Math.random() - 0.5) * 1,
                 radius: 4,
             });
         }
       });
+       if (playerNode) {
+          // Player orb collection
+          nextState.energyOrbs = nextState.energyOrbs.filter(orb => {
+              const dx = playerNode.x - orb.x;
+              const dy = playerNode.y - orb.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < playerNode.radius + orb.radius + ORB_COLLECTION_LEEWAY) {
+                  nextState.energy += 10;
+                  audioService.playSound('collect_orb_standard');
+                  return false;
+              }
+              return true;
+          });
+      }
       
       // Filter out removed nodes
       if (nodesToRemove.size > 0) {
@@ -435,70 +483,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       });
       nextState.phages = nextPhages;
 
-      // --- PLAYER LOGIC ---
-      const playerNode = mutableNodes.find(n => n.type === 'player_consciousness');
-      if (playerNode) {
-          if (playerNode.playerState === 'PROJECTING') {
-              playerNode.reformTimer! -= 1;
-              if (playerNode.reformTimer! <= 0) {
-                  playerNode.playerState = 'REFORMING';
-                  playerNode.reformTimer = PLAYER_REFORM_TIME;
-                  playerNode.vx = 0;
-                  playerNode.vy = 0;
-                  playerNode.x = nextState.projectionState.launchPosition.x;
-                  playerNode.y = nextState.projectionState.launchPosition.y;
-              } else {
-                  // Collection logic
-                   nextState.energyOrbs = nextState.energyOrbs.filter(orb => {
-                      const dx = playerNode.x - orb.x;
-                      const dy = playerNode.y - orb.y;
-                      const dist = Math.sqrt(dx*dx + dy*dy);
-                      if (dist < playerNode.radius + orb.radius + ORB_COLLECTION_LEEWAY) {
-                          nextState.energy += 10;
-                          audioService.playSound('collect_orb_standard');
-                          return false;
-                      }
-                      return true;
-                  });
-              }
-          }
-          if (playerNode.playerState === 'REFORMING') {
-              playerNode.reformTimer! -= 1;
-              if (playerNode.reformTimer! <= 0) {
-                  playerNode.playerState = 'IDLE';
-                  nextState.projectionState = {...initialState.projectionState, launchPosition: { x: playerNode.x, y: playerNode.y }};
-                  if (nextState.tutorialStep === 3) {
-                    nextState.tutorialStep++;
-                  }
-              }
-          }
-      }
       nextState.nodes = mutableNodes;
       nextState.energyOrbs = [...nextState.energyOrbs, ...newEnergyOrbs];
-
-      // --- AIM ASSIST LOGIC ---
-      if (nextState.projectionState.phase === 'aiming' && nextState.settings.aimAssist && playerNode) {
-        const aimAngle = nextState.projectionState.angle;
-        let bestTarget: string | null = null;
-        let bestAngleDiff = 0.2; // ~11.5 degrees tolerance
-
-        nextState.nodes.forEach(node => {
-            if (node.id === playerNode.id) return;
-            const dx = node.x - playerNode.x;
-            const dy = node.y - playerNode.y;
-            const nodeAngle = Math.atan2(dy, dx);
-            let angleDiff = Math.abs(aimAngle - nodeAngle);
-            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-
-            if (angleDiff < bestAngleDiff) {
-                bestAngleDiff = angleDiff;
-                bestTarget = node.id;
-            }
-        });
-        nextState.aimAssistTargetId = bestTarget;
-      } else {
-        nextState.aimAssistTargetId = null;
-      }
       
       // Update other systems...
       // Chapter progression
@@ -559,13 +545,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'END_CHAPTER_TRANSITION':
       return { ...state, activeChapterTransition: null };
     case 'SELECT_NODE':
-      if (state.tutorialStep === 4 && action.payload.nodeId === 'tutorial_planet') {
-        return { ...state, selectedNodeId: action.payload.nodeId, tutorialStep: 5 };
+      if (state.tutorialStep === 2 && action.payload.nodeId === 'tutorial_planet') {
+        return { ...state, selectedNodeId: action.payload.nodeId, tutorialStep: 3 };
       }
       return { ...state, selectedNodeId: action.payload.nodeId };
     case 'SET_LORE_LOADING':
-      if (state.tutorialStep === 5 && action.payload.nodeId === 'tutorial_planet') {
-          return { ...state, loreState: { nodeId: action.payload.nodeId, text: '', isLoading: true }, tutorialStep: 6 };
+      if (state.tutorialStep === 3 && action.payload.nodeId === 'tutorial_planet') {
+          return { ...state, loreState: { nodeId: action.payload.nodeId, text: '', isLoading: true }, tutorialStep: 4 };
       }
       return { ...state, loreState: { nodeId: action.payload.nodeId, text: '', isLoading: true } };
     case 'SET_LORE_RESULT':
@@ -575,72 +561,38 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, loreState: { nodeId: null, text: '', isLoading: false } };
     case 'SET_PAUSED':
       return { ...state, isPaused: action.payload };
-    case 'PLAYER_CONTROL_CLICK': {
-      const playerNode = state.nodes.find(n => n.type === 'player_consciousness');
-      if (!playerNode || playerNode.playerState !== 'IDLE') return state;
-
-      let nextState = { ...state };
-      let nextProjectionState = { ...state.projectionState };
-      const currentPhase = state.projectionState.phase;
-      
-      switch (currentPhase) {
-          case 'inactive':
-              nextProjectionState.phase = 'aiming';
-              if (state.tutorialStep === 0) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
-              break;
-          case 'aiming':
-              nextProjectionState.phase = 'charging';
-              nextProjectionState.power = 0.5; // Start at a default power
-              if (state.tutorialStep === 1) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
-              break;
-          case 'charging':
-              const speed = PLAYER_PROJECTION_MIN_SPEED + state.projectionState.power * (PLAYER_PROJECTION_MAX_SPEED - PLAYER_PROJECTION_MIN_SPEED);
-              const angle = state.aimAssistTargetId 
-                  ? Math.atan2(
-                      state.nodes.find(n => n.id === state.aimAssistTargetId)!.y - playerNode.y,
-                      state.nodes.find(n => n.id === state.aimAssistTargetId)!.x - playerNode.x
-                    )
-                  : state.projectionState.angle;
-              
-              const newNodes = state.nodes.map(n => {
-                  if (n.id === playerNode.id) {
-                      return { 
-                          ...n, 
-                          playerState: 'PROJECTING' as PlayerState,
-                          vx: Math.cos(angle) * speed,
-                          vy: Math.sin(angle) * speed,
-                          reformTimer: PLAYER_PROJECTION_LIFESPAN,
-                      };
-                  }
-                  return n;
-              });
-              nextState.nodes = newNodes;
-              
-              // Reset projection state for the next shot after reforming
-              nextProjectionState = { ...initialState.projectionState, phase: 'inactive' };
-
-              if (state.tutorialStep === 2) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
-              break;
-      }
-      
-      nextProjectionState.launchPosition = { x: playerNode.x, y: playerNode.y };
-      return { ...nextState, projectionState: nextProjectionState };
-    }
-    case 'AIM_WITH_MOUSE': {
-        if (state.projectionState.phase !== 'aiming') return state;
+    case 'START_AIMING':
+        if (state.projection.playerState !== 'IDLE') return state;
+        let nextTutorialStep = state.tutorialStep;
+        if (state.tutorialStep === 0) {
+            nextTutorialStep = 1;
+        }
+        return { ...state, tutorialStep: nextTutorialStep, projection: { ...state.projection, playerState: 'AIMING_DIRECTION' } };
+    case 'SET_DIRECTION':
+        if (state.projection.playerState !== 'AIMING_DIRECTION') return state;
+         let nextTutorialStep2 = state.tutorialStep;
+        if (state.tutorialStep === 1) {
+            nextTutorialStep2 = 2;
+        }
+        return { ...state, tutorialStep: nextTutorialStep2, projection: { ...state.projection, playerState: 'AIMING_POWER' } };
+    case 'LAUNCH_PLAYER': {
+        if (state.projection.playerState !== 'AIMING_POWER') return state;
         const player = state.nodes.find(n => n.type === 'player_consciousness');
         if (!player) return state;
 
-        const dx = action.payload.worldX - player.x;
-        const dy = action.payload.worldY - player.y;
-        const angle = Math.atan2(dy, dx);
-
-        return { ...state, projectionState: { ...state.projectionState, angle } };
-    }
-    case 'ADJUST_LAUNCH_POWER': {
-        if (state.projectionState.phase !== 'charging') return state;
-        const newPower = Math.max(0, Math.min(1, state.projectionState.power + action.payload.delta));
-        return { ...state, projectionState: { ...state.projectionState, power: newPower } };
+        const launchStrength = (state.projection.power / 100) * MAX_LAUNCH_POWER;
+        const newNodes = state.nodes.map(n => 
+            n.id === player.id ? {
+                ...n,
+                vx: Math.cos(state.projection.aimAngle) * launchStrength,
+                vy: Math.sin(state.projection.aimAngle) * launchStrength,
+            } : n
+        );
+         let nextTutorialStep3 = state.tutorialStep;
+        if (state.tutorialStep === 2) {
+            nextTutorialStep3 = 3;
+        }
+        return { ...state, tutorialStep: nextTutorialStep3, nodes: newNodes, projection: { ...state.projection, playerState: 'PROJECTING', power: 0 }};
     }
     case 'CHANGE_SETTING': {
         const { key, value } = action.payload;
@@ -683,22 +635,40 @@ const App: React.FC = () => {
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
+  
+  // State for resource pulse animations
+  const [energyPulse, setEnergyPulse] = useState(false);
+  const [knowledgePulse, setKnowledgePulse] = useState(false);
+  const prevResources = useRef({ energy: gameState.energy, knowledge: gameState.knowledge });
 
   useEffect(() => {
     const handleResize = () => setDimensions({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  
+  // Effect for resource pulse animations
+  useEffect(() => {
+    if (gameState.energy > prevResources.current.energy) {
+        setEnergyPulse(true);
+        setTimeout(() => setEnergyPulse(false), 500);
+    }
+    if (gameState.knowledge > prevResources.current.knowledge) {
+        setKnowledgePulse(true);
+        setTimeout(() => setKnowledgePulse(false), 500);
+    }
+    prevResources.current = { energy: gameState.energy, knowledge: gameState.knowledge };
+  }, [gameState.energy, gameState.knowledge]);
 
   const { transform, handleWheel, handleMouseDown, handleMouseUp, handleMouseMove, screenToWorld: rawScreenToWorld, zoom, isPanningRef } = useWorldScale();
   const screenToWorld = useCallback((x: number, y: number) => rawScreenToWorld(x, y, dimensions), [rawScreenToWorld, dimensions]);
 
   useGameLoop(dispatch, dimensions, gameState.isPaused, transform);
 
-  const startGame = useCallback(async () => {
-    const prompt = getNodeImagePrompt('player_consciousness');
-    const imageUrl = await generateNodeImage(prompt);
-    dispatch({ type: 'START_GAME', payload: { playerImageUrl: imageUrl || '' } });
+  const startGame = useCallback(() => {
+    const playerImages = NODE_IMAGE_MAP['player_consciousness'];
+    const imageUrl = playerImages[0] || '';
+    dispatch({ type: 'START_GAME', payload: { playerImageUrl: imageUrl } });
   }, []);
 
   const loadGame = useCallback(() => {
@@ -741,11 +711,11 @@ const App: React.FC = () => {
       <div className="hud-container">
           <div className="hud-top-bar">
               <div className="hud-resources hud-element">
-                  <div className="hud-resource-item" title="Energy">
+                  <div className={`hud-resource-item ${energyPulse ? 'resource-pulse' : ''}`} title="Energy: The raw power of the cosmos. Generated by stars.">
                     <svg fill="#fde047" viewBox="0 0 20 20"><path d="M11.23 13.06l-1.33 4.14a.5.5 0 01-.94 0l-1.33-4.14-.85.35a.5.5 0 01-.59-.64L7.5 7.5H4.5a.5.5 0 01-.4-.8l6-5.5a.5.5 0 01.8 0l6 5.5a.5.5 0 01-.4.8H13.5L12.18 12.77l-.95.29z"/></svg>
                     <span>{Math.floor(gameState.energy).toLocaleString()}</span>
                   </div>
-                  <div className="hud-resource-item" title="Knowledge">
+                  <div className={`hud-resource-item ${knowledgePulse ? 'resource-pulse' : ''}`} title="Knowledge: Your understanding of universal laws. Generated passively over time.">
                     <svg fill="#a78bfa" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zM5.13 5.13a6 6 0 018.48 0L10 10 5.13 5.13zM10 18a6 6 0 01-4.24-1.76l4.24-4.24 4.24 4.24A6 6 0 0110 18z"/></svg>
                     <span>{Math.floor(gameState.knowledge).toLocaleString()}</span>
                   </div>
@@ -758,6 +728,10 @@ const App: React.FC = () => {
                   </div>
                    <div className="hud-chapter-progress-bar" title={`Chapter Progress: ${chapterProgress.toFixed(0)}%`}>
                       <div className="hud-chapter-progress-fill" style={{ width: `${chapterProgress}%` }} />
+                      <span className="chapter-progress-text">{unlockedChapterUpgrades}/{chapterUpgrades.length} Upgrades</span>
+                   </div>
+                   <div className="hud-chapter-objective">
+                      <p>Objective: {chapterInfo.objective}</p>
                    </div>
                    <div className="hud-karma-meter">
                         <div className="karma-labels">

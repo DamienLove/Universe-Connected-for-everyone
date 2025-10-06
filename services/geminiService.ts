@@ -81,27 +81,49 @@ export const getGeminiLoreForNode = async (node: GameNode, chapter: Chapter): Pr
     }
 };
 
-export const generateNodeImage = async (prompt: string): Promise<string | null> => {
-    try {
-        const response = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
-            prompt: prompt,
-            config: {
-                numberOfImages: 1,
-                outputMimeType: 'image/png', // Use PNG for potential transparency
-                aspectRatio: '1:1',
-            },
-        });
+const MAX_RETRIES = 5;
+const INITIAL_BACKOFF_MS = 1000;
 
-        if (response.generatedImages && response.generatedImages.length > 0) {
-            const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
-            return `data:image/png;base64,${base64ImageBytes}`;
+export const generateNodeImage = async (prompt: string): Promise<string | null> => {
+    let retries = 0;
+    while (retries < MAX_RETRIES) {
+        try {
+            const response = await ai.models.generateImages({
+                model: 'imagen-4.0-generate-001',
+                prompt: prompt,
+                config: {
+                    numberOfImages: 1,
+                    outputMimeType: 'image/png', // Use PNG for potential transparency
+                    aspectRatio: '1:1',
+                },
+            });
+
+            if (response.generatedImages && response.generatedImages.length > 0) {
+                const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+                return `data:image/png;base64,${base64ImageBytes}`;
+            }
+            console.warn("The image generation API did not return an image. This might be due to safety filters or a transient issue.");
+            return null; // Successful response but no image, so we don't retry.
+        } catch (error: any) {
+            // Check if it is a rate-limiting error by inspecting the error message.
+            const errorMessage = (error.toString() || '').toLowerCase();
+            if (errorMessage.includes('429') || errorMessage.includes('resource_exhausted') || errorMessage.includes('quota')) {
+                retries++;
+                if (retries >= MAX_RETRIES) {
+                    console.error(`Error generating image after ${MAX_RETRIES} retries due to rate limiting.`, error);
+                    return null; // Max retries reached
+                }
+                // Calculate delay with exponential backoff and add random jitter
+                const delay = INITIAL_BACKOFF_MS * Math.pow(2, retries - 1) + Math.random() * 1000;
+                console.warn(`Rate limit hit. Retrying in ${delay.toFixed(0)}ms... (Attempt ${retries}/${MAX_RETRIES})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                // Not a rate-limiting error, so we fail immediately.
+                console.error(`Error generating image:`, error);
+                return null;
+            }
         }
-        console.warn("The image generation API did not return an image. This might be due to safety filters or a transient issue.");
-        return null;
-    } catch (error) {
-        console.error(`Error generating image:`, error);
-        // Return null to allow for graceful fallback instead of throwing an error.
-        return null;
     }
+    // Should not be reached, but as a fallback.
+    return null;
 };

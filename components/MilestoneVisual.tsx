@@ -38,14 +38,14 @@ const getVisuals = (imageUrl?: string): { [key: string]: React.ReactNode } => ({
   ),
   star_formation: (
     <div className="milestone-scene bg-black flex items-center justify-center">
-      {imageUrl ? (
-        <div className="flex items-center justify-center">
-          <img src={imageUrl} alt="Newly formed star" className="w-[80vmin] h-[80vmin] object-cover rounded-full star-formation-image" />
+        <div className="star-formation-container">
+             <div className="gas-cloud"></div>
+            {imageUrl && (
+                <img src={imageUrl} alt="Newly formed star" className="formed-star" />
+            )}
+            <div className="star-shockwave"></div>
         </div>
-      ) : (
-        <div className="gas-cloud"></div>
-      )}
-      <h2 className="milestone-title">From dust and gas, the first light is born.</h2>
+        <h2 className="milestone-title">From dust and gas, the first light is born.</h2>
     </div>
   ),
   planetary_accretion: (
@@ -169,7 +169,11 @@ const MilestoneVisual: React.FC<MilestoneVisualProps> = ({ milestoneId, imageUrl
 
   return (
     <div className="milestone-container" style={{ animationDuration: `1s, 1s`, animationDelay: `0s, ${duration/1000 -1}s`}}>
+      <div className="milestone-explosion-flash" />
       {visualContent}
+      <button className="milestone-skip-button" onClick={onComplete}>
+        Skip
+      </button>
     </div>
   );
 };

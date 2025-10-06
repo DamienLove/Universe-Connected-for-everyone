@@ -1,10 +1,12 @@
 
 
-import React from 'react';
-import { GameAction, GameState, GameNode, WorldTransform } from '../types';
+
+
+import React, { useRef } from 'react';
+import { GameAction, GameState, WorldTransform } from '../types';
 import RadialMenu from './RadialMenu';
 import LoreTooltip from './LoreTooltip';
-import { getGeminiLoreForNode, generateNodeImage } from '../services/geminiService';
+import { getGeminiLoreForNode } from '../services/geminiService';
 import { CHAPTERS } from './constants';
 
 interface SimulationProps {
@@ -24,7 +26,7 @@ interface SimulationProps {
 }
 
 const PLAYER_HUNT_RANGE = 150;
-const TUNNEL_DURATION_TICKS = 60; // Must match constant in App.tsx
+const REFORM_DURATION = 120; // Must match constant in App.tsx
 
 const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions, isZoomingOut, transform, worldScaleHandlers, screenToWorld, isPanningRef }) => {
   const { width, height } = dimensions;
@@ -34,34 +36,36 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
   const handleNodeClick = (nodeId: string) => {
     dispatch({ type: 'SELECT_NODE', payload: { nodeId } });
   };
+  
+  const handlePlayerInteraction = (e: React.MouseEvent) => {
+    // This function now handles the entire projection state machine on clicks
+    switch (gameState.projection.playerState) {
+        case 'IDLE':
+            dispatch({ type: 'START_AIMING' });
+            break;
+        case 'AIMING_DIRECTION':
+            dispatch({ type: 'SET_DIRECTION' });
+            break;
+        case 'AIMING_POWER':
+            dispatch({ type: 'LAUNCH_PLAYER' });
+            break;
+        default:
+            // Do nothing if projecting or reforming
+            break;
+    }
+  };
 
   const handleContainerClick = (e: React.MouseEvent) => {
+    // Allow clicking anywhere to control the player
     if (e.target === e.currentTarget && !isPanningRef.current) {
         if(gameState.selectedNodeId) {
             dispatch({ type: 'SELECT_NODE', payload: { nodeId: null } });
         } else {
-            dispatch({ type: 'PLAYER_CONTROL_CLICK' });
+             handlePlayerInteraction(e);
         }
     }
   };
 
-  const handleMouseMoveForAiming = (e: React.MouseEvent) => {
-    if (gameState.projectionState.phase === 'aiming' && !isPanningRef.current) {
-      const { x, y } = screenToWorld(e.clientX, e.clientY);
-      dispatch({ type: 'AIM_WITH_MOUSE', payload: { worldX: x, worldY: y } });
-    }
-  };
-
-  const handleWheelForPower = (e: React.WheelEvent) => {
-    if (gameState.projectionState.phase === 'charging') {
-      e.preventDefault();
-      e.stopPropagation();
-      const delta = e.deltaY > 0 ? -0.05 : 0.05;
-      dispatch({ type: 'ADJUST_LAUNCH_POWER', payload: { delta } });
-    } else {
-      worldScaleHandlers.handleWheel(e);
-    }
-  };
 
   const handleAsk = async (nodeId: string) => {
     const node = gameState.nodes.find(n => n.id === nodeId);
@@ -85,95 +89,18 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
     return Math.sqrt(dx * dx + dy * dy) < PLAYER_HUNT_RANGE;
   }) : [];
   
-  const renderProjectionUI = () => {
-    if (!playerNode || playerNode.playerState !== 'IDLE') return null;
-
-    const { projectionState, aimAssistTargetId } = gameState;
-    const { phase, angle, power } = projectionState;
-
-    if (phase === 'inactive') return null;
-    
-    // Aim indicator
-    const aimAngleDegrees = angle * (180 / Math.PI); // Convert radians to degrees
-    const aimIndicator = (
-      <div
-        id="aim-indicator"
-        className={`aim-indicator ${aimAssistTargetId ? 'locked-on' : ''}`}
-        style={{
-          left: `${playerNode.x}px`,
-          top: `${playerNode.y}px`,
-          width: '500px',
-          transform: `rotate(${aimAngleDegrees}deg)`,
-          opacity: phase === 'charging' ? 0.5 : 1,
-        }}
-      />
-    );
-    
-    // Power meter
-    const powerMeterRadius = playerNode.radius + 15;
-    const circumference = 2 * Math.PI * powerMeterRadius;
-    const powerMeter = phase === 'charging' && (
-      <svg 
-        id="power-meter-container"
-        width={powerMeterRadius * 2 + 8} height={powerMeterRadius * 2 + 8}
-        style={{
-            left: `${playerNode.x}px`, top: `${playerNode.y}px`,
-            filter: 'drop-shadow(0 0 5px #00f6ff)'
-        }}
-    >
-        <circle
-            className="power-meter-bg"
-            cx="50%" cy="50%" r={powerMeterRadius}
-            strokeWidth="4" fill="transparent"
-        />
-        <circle
-            className="power-meter-fg"
-            cx="50%" cy="50%" r={powerMeterRadius}
-            strokeWidth="4" fill="transparent"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference * (1 - power)}
-            transform={`rotate(-90 ${powerMeterRadius+4} ${powerMeterRadius+4})`}
-        />
-      </svg>
-    );
-
-    return <> {aimIndicator} {powerMeter} </>;
-  };
-
-  const renderReformingParticles = () => {
-      if (!playerNode || playerNode.playerState !== 'REFORMING') return null;
-      
-      return Array.from({length: 30}).map((_, i) => {
-          const angle = (i / 30) * Math.PI * 2 + (Math.random() - 0.5);
-          // By using a constant distance, we create a stable vortex instead of a jittery slideshow effect.
-          const dist = 150 + Math.random() * 50; 
-          return (
-              <div key={i} className="reforming-particle" style={{
-                  left: `${gameState.projectionState.launchPosition.x}px`,
-                  top: `${gameState.projectionState.launchPosition.y}px`,
-                  width: '5px', height: '5px',
-                  // CSS Custom Properties for the animation
-                  '--x-start': `${Math.cos(angle) * dist}px`,
-                  '--y-start': `${Math.sin(angle) * dist}px`,
-              } as React.CSSProperties} />
-          );
-      });
-  }
-  
   const worldRadius = (Math.min(width, height) * 1.5) / (gameState.zoomLevel + 1);
 
   return (
     <div
       className="simulation-container"
-      onWheel={handleWheelForPower}
+      onWheel={worldScaleHandlers.handleWheel}
       onMouseDown={worldScaleHandlers.handleMouseDown}
       onMouseUp={worldScaleHandlers.handleMouseUp}
-      onMouseMove={(e) => {
-        worldScaleHandlers.handleMouseMove(e);
-        handleMouseMoveForAiming(e);
-      }}
+      onMouseMove={worldScaleHandlers.handleMouseMove}
       onMouseLeave={worldScaleHandlers.handleMouseUp}
       onClick={handleContainerClick}
+      style={{ cursor: isPanningRef.current ? 'grabbing' : 'crosshair' }}
     >
       <div
         className={`world-container ${isZoomingOut ? 'level-zoom-out' : ''}`}
@@ -218,6 +145,55 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
             />
           ))}
         </svg>
+
+        {/* --- Player Projection UI --- */}
+        {playerNode && gameState.projection.playerState === 'AIMING_DIRECTION' && (
+             <div
+                id="aim-indicator"
+                className="aim-indicator"
+                style={{
+                    left: `${playerNode.x}px`, top: `${playerNode.y}px`,
+                    width: '300px',
+                    transform: `rotate(${gameState.projection.aimAngle}rad)`,
+                }}
+            />
+        )}
+         {playerNode && gameState.projection.playerState === 'AIMING_POWER' && (
+             <div id="power-meter-container" style={{ left: `${playerNode.x}px`, top: `${playerNode.y}px` }}>
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(0, 246, 255, 0.2)" strokeWidth="4" />
+                    <path
+                        d={`M 60 10 A 50 50 0 ${gameState.projection.power > 50 ? 1 : 0} 1 ${60 + 50 * Math.sin(2 * Math.PI * gameState.projection.power / 100)} ${60 - 50 * Math.cos(2 * Math.PI * gameState.projection.power / 100)}`}
+                        fill="none"
+                        stroke="#00f6ff"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                    />
+                </svg>
+            </div>
+        )}
+        {playerNode && gameState.projection.playerState === 'PROJECTING' && (
+             <div className="projectile-trail" style={{
+                 left: `${playerNode.x}px`, top: `${playerNode.y}px`,
+                 transform: `rotate(${Math.atan2(playerNode.vy, playerNode.vx) * (180/Math.PI) + 90}deg)`
+             }}/>
+        )}
+         {playerNode && gameState.projection.playerState === 'REFORMING' && (
+             <>
+              {Array.from({length: 20}).map((_, i) => {
+                  const angle = (i/20) * Math.PI * 2;
+                  const dist = (gameState.projection.reformTimer / REFORM_DURATION) * 150;
+                  return (
+                      <div key={i} className="reforming-particle" style={{
+                          left: `${playerNode.x}px`, top: `${playerNode.y}px`,
+                          width: '4px', height: '4px',
+                          '--x-start': `${Math.cos(angle) * dist}px`,
+                          '--y-start': `${Math.sin(angle) * dist}px`,
+                      } as React.CSSProperties}/>
+                  );
+              })}
+             </>
+        )}
 
         {/* Render Connection Pulses */}
         {gameState.connectionParticles.map(particle => {
@@ -391,6 +367,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
 
         {/* Render Game Nodes */}
         {gameState.nodes.map(node => {
+            const isPlayer = node.type === 'player_consciousness';
             const blackHoles = gameState.cosmicEvents.filter(e => e.type === 'black_hole');
             let warpingClassName = '';
             if (blackHoles.length > 0) {
@@ -412,6 +389,8 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                 node.id === gameState.selectedNodeId ? 'selected' : '',
                 node.tunnelingState ? `tunnel-${node.tunnelingState.phase}` : ''
             ].join(' ');
+            
+            const isHidden = isPlayer && gameState.projection.playerState === 'REFORMING';
 
             return (
                 <div
@@ -419,13 +398,18 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                     data-node-id={node.id}
                     onClick={(e) => {
                         e.stopPropagation();
-                        handleNodeClick(node.id);
+                        if (isPlayer) {
+                           handlePlayerInteraction(e);
+                        } else {
+                           handleNodeClick(node.id);
+                        }
                     }}
                     className={`node-container ${otherClasses} ${warpingClassName}`}
                     style={{
                         left: `${node.x}px`, top: `${node.y}px`,
                         width: `${node.radius * 2}px`, height: `${node.radius * 2}px`,
-                        '--tunnel-duration': `${TUNNEL_DURATION_TICKS / 60}s`,
+                        opacity: isHidden ? 0 : 1,
+                        cursor: isPlayer ? 'pointer' : 'pointer',
                     } as React.CSSProperties}
                 >
                  {node.imageUrl ? (
@@ -436,16 +420,10 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                  ) : (
                     <div className={`node-image ${node.type} ${node.hasLife ? 'hasLife' : ''}`} />
                  )}
-                 {node.type === 'player_consciousness' && node.playerState === 'PROJECTING' && <div className="player-projection-trail" />}
-                 {node.type === 'player_consciousness' && node.playerState === 'IDLE' && <div className="player-idle-aura" />}
                 </div>
             )
         })}
         
-        {renderReformingParticles()}
-        
-        {renderProjectionUI()}
-
         {selectedNode && selectedNode.id !== playerNode?.id && (
             <RadialMenu node={selectedNode} dispatch={dispatch} onAsk={handleAsk} />
         )}

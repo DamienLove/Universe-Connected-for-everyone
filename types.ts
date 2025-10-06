@@ -1,19 +1,16 @@
 // This file was created by inferring types from their usage in other files.
 
-export type PlayerState = 'IDLE' | 'PROJECTING' | 'REFORMING';
+export interface ProjectionState {
+  playerState: 'IDLE' | 'AIMING_DIRECTION' | 'AIMING_POWER' | 'PROJECTING' | 'REFORMING';
+  aimAngle: number;
+  power: number; // 0 to 100
+  reformTimer: number;
+}
 
 export interface WorldTransform {
   x: number;
   y: number;
   scale: number;
-}
-
-export interface ProjectionState {
-  phase: 'inactive' | 'aiming' | 'charging';
-  angle: number; // in radians
-  power: number; // 0 to 1
-  launchPosition: { x: number; y: number };
-  powerDirection: 1 | -1;
 }
 
 export interface GameNode {
@@ -35,9 +32,6 @@ export interface GameNode {
     targetX: number;
     targetY: number;
   } | null;
-  // Player-specific state
-  playerState?: PlayerState;
-  reformTimer?: number;
 }
 
 export interface QuantumPhage {
@@ -159,8 +153,8 @@ export interface GameState {
     isLoading: boolean;
   };
   
-  // New Projection Mechanic State
-  projectionState: ProjectionState;
+  // New Player Control State
+  projection: ProjectionState;
 
   // Visual Effects
   connectionParticles: ConnectionParticle[];
@@ -210,6 +204,7 @@ export interface Chapter {
   name: string;
   description: string;
   unlockCondition: (gameState: GameState) => boolean;
+  objective: string;
   quote: string;
   entityType: 'gas' | 'single' | 'multi' | 'universal';
 }
@@ -253,11 +248,11 @@ export type GameAction =
   | { type: 'SAVE_GAME' }
   | { type: 'LOAD_GAME'; payload: GameState }
   | { type: 'CHANGE_SETTING'; payload: { key: keyof GameState['settings']; value: string | number | boolean } }
-  | { type: 'PLAYER_CONTROL_CLICK' }
   | { type: 'START_LEVEL_TRANSITION' }
   | { type: 'COMPLETE_LEVEL_TRANSITION' }
   | { type: 'UPDATE_NODE_IMAGE'; payload: { nodeId: string, imageUrl: string } }
   | { type: 'END_CHAPTER_TRANSITION' }
-  | { type: 'AIM_WITH_MOUSE'; payload: { worldX: number; worldY: number } }
-  | { type: 'ADJUST_AIM_ANGLE'; payload: { delta: number } }
-  | { type: 'ADJUST_LAUNCH_POWER'; payload: { delta: number } };
+  // Player Control Actions
+  | { type: 'START_AIMING' }
+  | { type: 'SET_DIRECTION' }
+  | { type: 'LAUNCH_PLAYER' };

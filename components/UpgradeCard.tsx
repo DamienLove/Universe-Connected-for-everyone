@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Upgrade, GameState, NodeType } from '../types';
-import { getGeminiFlavorText, generateNodeImage } from '../services/geminiService';
-import { getNodeImagePrompt } from '../services/promptService';
+import { getGeminiFlavorText } from '../services/geminiService';
+import { NODE_IMAGE_MAP } from './constants';
 
 interface UpgradeCardProps {
   upgrade: Upgrade;
@@ -15,7 +16,6 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
   const [isExpanded, setIsExpanded] = useState(false);
   const [flavorText, setFlavorText] = useState<string>('');
   const [isLoadingFlavorText, setIsLoadingFlavorText] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   useEffect(() => {
     if (isExpanded && !flavorText && !isLoadingFlavorText) {
@@ -34,29 +34,20 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
     }
   }, [isExpanded, flavorText, isLoadingFlavorText, upgrade.title]);
 
-  const handlePurchase = async (e: React.MouseEvent) => {
+  const handlePurchase = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isPurchaseable(upgrade)) return;
 
     const nodeTypeToGenerate = upgrade.generatesNodeType || upgrade.modifiesNodeTypeTarget;
+    let imageUrl: string | undefined;
 
     if (nodeTypeToGenerate) {
-        setIsGeneratingImage(true);
-        try {
-            const prompt = getNodeImagePrompt(nodeTypeToGenerate);
-            const imageUrl = await generateNodeImage(prompt); // Returns string | null
-            // Pass imageUrl if it's a valid string, otherwise pass undefined.
-            onPurchase(upgrade, imageUrl ?? undefined);
-        } catch (error) {
-            // This catch is now for unexpected errors, not API failures.
-            console.error("An unexpected error occurred during the upgrade purchase process:", error);
-            onPurchase(upgrade); // Fallback to purchasing without an image
-        } finally {
-            setIsGeneratingImage(false);
+        const images = NODE_IMAGE_MAP[nodeTypeToGenerate];
+        if (images && images.length > 0) {
+            imageUrl = images[Math.floor(Math.random() * images.length)];
         }
-    } else {
-        onPurchase(upgrade);
     }
+    onPurchase(upgrade, imageUrl);
   };
 
   const unlocked = gameState.unlockedUpgrades.has(upgrade.id);
@@ -73,7 +64,6 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
   const buttonText = () => {
       if (unlocked) return 'Unlocked';
       if (exclusiveLock) return 'Path Not Chosen';
-      if (isGeneratingImage) return 'Generating...';
       return 'Unlock';
   }
 
@@ -92,7 +82,7 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
         </div>
         <button
           onClick={handlePurchase}
-          disabled={!canBuy || unlocked || exclusiveLock || isGeneratingImage}
+          disabled={!canBuy || unlocked || exclusiveLock}
           className={`px-4 py-2 rounded transition-colors ml-4 whitespace-nowrap ${
             unlocked ? 'bg-gray-600 cursor-not-allowed' :
             exclusiveLock ? 'bg-red-900 text-gray-500 cursor-not-allowed' :

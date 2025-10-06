@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { GameAction, GameState, GameNode, WorldTransform } from '../types';
 import RadialMenu from './RadialMenu';
@@ -289,6 +290,14 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                      }} />
                  );
             }
+            if (event.type === 'black_hole') {
+                 return (
+                     <div key={event.id} style={{ left: `${event.x}px`, top: `${event.y}px`, pointerEvents: 'none' }}>
+                         <div className="black-hole-core" style={{ width: `${event.radius * 2}px`, height: `${event.radius * 2}px` }} />
+                         <div className="black-hole-accretion-disk" style={{ width: `${event.radius * 4}px`, height: `${event.radius * 4}px` }} />
+                     </div>
+                 );
+            }
             return null;
         })}
 
@@ -381,33 +390,57 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
         ))}
 
         {/* Render Game Nodes */}
-        {gameState.nodes.map(node => (
-            <div
-                key={node.id}
-                data-node-id={node.id}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    handleNodeClick(node.id);
-                }}
-                className={`node-container ${node.id === gameState.aimAssistTargetId ? 'aim-assist-target' : ''} ${node.type} ${node.id === gameState.selectedNodeId ? 'selected' : ''} ${node.tunnelingState ? `tunnel-${node.tunnelingState.phase}` : ''}`}
-                style={{
-                    left: `${node.x}px`, top: `${node.y}px`,
-                    width: `${node.radius * 2}px`, height: `${node.radius * 2}px`,
-                    '--tunnel-duration': `${TUNNEL_DURATION_TICKS / 60}s`,
-                } as React.CSSProperties}
-            >
-             {node.imageUrl ? (
-                <div 
-                    className={`node-image ${node.type} ${node.hasLife ? 'hasLife' : ''}`} 
-                    style={{ backgroundImage: `url(${node.imageUrl})`}}
-                />
-             ) : (
-                <div className={`node-image ${node.type} ${node.hasLife ? 'hasLife' : ''}`} />
-             )}
-             {node.type === 'player_consciousness' && node.playerState === 'PROJECTING' && <div className="player-projection-trail" />}
-             {node.type === 'player_consciousness' && node.playerState === 'IDLE' && <div className="player-idle-aura" />}
-            </div>
-        ))}
+        {gameState.nodes.map(node => {
+            const blackHoles = gameState.cosmicEvents.filter(e => e.type === 'black_hole');
+            let warpingClassName = '';
+            if (blackHoles.length > 0) {
+                for (const bh of blackHoles) {
+                    const dx = node.x - bh.x;
+                    const dy = node.y - bh.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const influenceRadius = bh.radius * 4;
+                    if (dist < influenceRadius) {
+                        warpingClassName = 'node-warping';
+                        break;
+                    }
+                }
+            }
+
+            const otherClasses = [
+                node.id === gameState.aimAssistTargetId ? 'aim-assist-target' : '',
+                node.type,
+                node.id === gameState.selectedNodeId ? 'selected' : '',
+                node.tunnelingState ? `tunnel-${node.tunnelingState.phase}` : ''
+            ].join(' ');
+
+            return (
+                <div
+                    key={node.id}
+                    data-node-id={node.id}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleNodeClick(node.id);
+                    }}
+                    className={`node-container ${otherClasses} ${warpingClassName}`}
+                    style={{
+                        left: `${node.x}px`, top: `${node.y}px`,
+                        width: `${node.radius * 2}px`, height: `${node.radius * 2}px`,
+                        '--tunnel-duration': `${TUNNEL_DURATION_TICKS / 60}s`,
+                    } as React.CSSProperties}
+                >
+                 {node.imageUrl ? (
+                    <div 
+                        className={`node-image ${node.type} ${node.hasLife ? 'hasLife' : ''}`} 
+                        style={{ backgroundImage: `url(${node.imageUrl})`}}
+                    />
+                 ) : (
+                    <div className={`node-image ${node.type} ${node.hasLife ? 'hasLife' : ''}`} />
+                 )}
+                 {node.type === 'player_consciousness' && node.playerState === 'PROJECTING' && <div className="player-projection-trail" />}
+                 {node.type === 'player_consciousness' && node.playerState === 'IDLE' && <div className="player-idle-aura" />}
+                </div>
+            )
+        })}
         
         {renderReformingParticles()}
         

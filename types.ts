@@ -104,12 +104,12 @@ export interface CollectionFlare {
 
 export interface CosmicEvent {
   id: string;
-  type: 'supernova' | 'gravitational_anomaly' | 'resource_bloom';
-  x: number;
-  y: number;
-  radius: number;
+  type: 'supernova' | 'gravitational_anomaly' | 'resource_bloom' | 'black_hole' | 'wave_of_harmony' | 'wave_of_discord';
+  x?: number;
+  y?: number;
+  radius?: number;
   duration: number; // Ticks remaining
-  strength: number;
+  strength?: number;
   targetNodeId?: string; // For supernova
   phase?: 'warning' | 'active'; // For multi-stage events like supernova
 }
@@ -219,6 +219,7 @@ export interface TutorialStep {
   highlight: string;
 }
 
+// FIX: Added missing CrossroadsEvent interface definition.
 export interface CrossroadsEvent {
   id: string;
   title: string;

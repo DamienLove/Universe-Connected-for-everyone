@@ -1,4 +1,5 @@
 
+
 import React, { useReducer, useState, useEffect, useCallback, useMemo } from 'react';
 import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, PlayerState, ProjectionState, CollectionBloom, CollectionFlare, WorldTransform } from '../types';
 import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS } from './constants';
@@ -30,7 +31,7 @@ const LIFE_BIOMASS_RATE = 0.2;
 const COLLECTIVE_UNITY_RATE = 0.1;
 const DATA_GENERATION_RATE = 0.2;
 const STAR_ORB_SPAWN_CHANCE = 0.005;
-const PHAGE_SPAWN_CHANCE = 0.001;
+const PHAGE_SPAWN_CHANCE = 0.0001;
 const PHAGE_ATTRACTION = 0.01;
 const PHAGE_DRAIN_RATE = 0.5;
 const PLAYER_HUNT_RANGE = 150;
@@ -40,6 +41,9 @@ const ANOMALY_DURATION_TICKS = 1200; // 20 seconds
 const ANOMALY_PULL_STRENGTH = 0.1;
 const BLOOM_DURATION_TICKS = 2400; // 40 seconds
 const BLOOM_SPAWN_MULTIPLIER = 20;
+const BLACK_HOLE_SPAWN_CHANCE = 0.00005;
+const BLACK_HOLE_DURATION_TICKS = 3600; // 1 minute
+const BLACK_HOLE_PULL_STRENGTH = 100;
 
 const PLAYER_PROJECTION_MAX_SPEED = 20;
 const PLAYER_PROJECTION_MIN_SPEED = 4;
@@ -130,6 +134,8 @@ const initialState: GameState = {
   }
 };
 
+const HARMONY_THRESHOLD = 50;
+const CHAOS_THRESHOLD = -50;
 
 // The main game reducer
 function gameReducer(state: GameState, action: GameAction): GameState {
@@ -156,48 +162,45 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const { width, height, transform } = action.payload;
       const worldRadius = (Math.min(width, height) * 1.5) / (state.zoomLevel + 1);
 
-      // Resource generation
-      nextState.knowledge += BASE_KNOWLEDGE_RATE;
+      // --- KARMA & GLOBAL MODIFIERS ---
+      let harmonyBonus = 1.0;
+      let chaosPenalty = 1.0;
 
+      if (nextState.karma > HARMONY_THRESHOLD) harmonyBonus = 1.25; // 25% passive boost
+      if (nextState.karma < CHAOS_THRESHOLD) chaosPenalty = 0.75; // 25% passive penalty
+
+      if (nextState.cosmicEvents.some(e => e.type === 'wave_of_harmony')) harmonyBonus *= 1.5; // Event-based 50% boost
+      if (nextState.cosmicEvents.some(e => e.type === 'wave_of_discord')) chaosPenalty *= 0.5; // Event-based 50% penalty
+
+      // --- RESOURCE GENERATION ---
+      nextState.knowledge += BASE_KNOWLEDGE_RATE;
       nextState.nodes.forEach(node => {
         if (node.type === 'star') nextState.energy += STAR_ENERGY_RATE;
-        if (node.hasLife) nextState.biomass += LIFE_BIOMASS_RATE;
+        if (node.hasLife) nextState.biomass += LIFE_BIOMASS_RATE * harmonyBonus;
       });
-
       if (nextState.unlockedUpgrades.has('cellular_specialization')) {
-        nextState.biomass += nextState.nodes.filter(n => n.hasLife).length * 0.5;
+        nextState.biomass += nextState.nodes.filter(n => n.hasLife).length * 0.5 * harmonyBonus;
       }
       if (nextState.unlockedUpgrades.has('collective_intelligence')) {
-        nextState.unity += COLLECTIVE_UNITY_RATE;
+        nextState.unity += COLLECTIVE_UNITY_RATE * harmonyBonus * chaosPenalty;
       }
       if (nextState.unlockedUpgrades.has('quantum_computing')) {
         nextState.data += DATA_GENERATION_RATE;
       }
       
-      const mutableNodes = nextState.nodes.map(n => ({...n}));
+      let mutableNodes = nextState.nodes.map(n => ({...n}));
+      const nodesToRemove = new Set<string>();
       let newEnergyOrbs: EnergyOrb[] = [];
       
-      // --- POWER METER OSCILLATION ---
-      let nextProjectionState = { ...nextState.projectionState };
-      if (nextProjectionState.phase === 'charging') {
-        let newPower = nextProjectionState.power + 0.02 * nextProjectionState.powerDirection;
-        if (newPower >= 1) {
-          newPower = 1;
-          nextProjectionState.powerDirection = -1;
-        } else if (newPower <= 0) {
-          newPower = 0;
-          nextProjectionState.powerDirection = 1;
-        }
-        nextProjectionState.power = newPower;
-        nextState.projectionState = nextProjectionState;
-      }
-
       // --- COSMIC EVENT MANAGEMENT ---
       let nextCosmicEvents = [...nextState.cosmicEvents];
       
-      // 1. Spawn new events
+      // 1. Spawn new events (influenced by karma)
       const hasSupernovaWarning = nextCosmicEvents.some(e => e.type === 'supernova' && e.phase === 'warning');
-      if (!hasSupernovaWarning && Math.random() < 0.0002) {
+      let supernovaChance = 0.0002;
+      if (nextState.karma < CHAOS_THRESHOLD) supernovaChance *= 3; // Chaos triples chance
+
+      if (!hasSupernovaWarning && Math.random() < supernovaChance) {
           const potentialStars = mutableNodes.filter(n => n.type === 'star');
           if (potentialStars.length > 0) {
               const star = potentialStars[Math.floor(Math.random() * potentialStars.length)];
@@ -207,12 +210,37 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   phase: 'warning',
                   targetNodeId: star.id,
                   x: star.x, y: star.y,
-                  radius: star.radius * 20, // Explosion radius
-                  strength: 0,
+                  radius: star.radius * 20,
                   duration: SUPERNOVA_WARNING_TICKS,
               });
               nextState.notifications.push('A star shows signs of instability...');
           }
+      }
+      
+      let bloomChance = 0.00015;
+      if (nextState.karma > HARMONY_THRESHOLD) bloomChance *= 3; // Harmony triples chance
+
+      if (nextCosmicEvents.filter(e => e.type === 'resource_bloom').length === 0 && Math.random() < bloomChance) {
+        nextCosmicEvents.push({
+          id: `bloom_${Date.now()}`,
+          type: 'resource_bloom',
+          x: (Math.random() - 0.5) * worldRadius,
+          y: (Math.random() - 0.5) * worldRadius,
+          radius: 120,
+          strength: BLOOM_SPAWN_MULTIPLIER,
+          duration: BLOOM_DURATION_TICKS,
+        });
+        nextState.notifications.push('A bloom of cosmic resources has appeared!');
+      }
+      
+      // Spawn global karma events
+      if (nextState.karma > HARMONY_THRESHOLD && !nextCosmicEvents.some(e => e.type === 'wave_of_harmony') && Math.random() < 0.0005) {
+          nextCosmicEvents.push({ id: `harmony_${Date.now()}`, type: 'wave_of_harmony', duration: 1800 });
+          nextState.notifications.push('A wave of cosmic harmony enhances growth and unity.');
+      }
+      if (nextState.karma < CHAOS_THRESHOLD && !nextCosmicEvents.some(e => e.type === 'wave_of_discord') && Math.random() < 0.0005) {
+          nextCosmicEvents.push({ id: `discord_${Date.now()}`, type: 'wave_of_discord', duration: 1800 });
+          nextState.notifications.push('A discordant echo stifles the growth of unity.');
       }
 
       if (nextCosmicEvents.filter(e => e.type === 'gravitational_anomaly').length === 0 && Math.random() < 0.0001) {
@@ -228,17 +256,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         nextState.notifications.push('A gravitational anomaly has formed!');
       }
 
-      if (nextCosmicEvents.filter(e => e.type === 'resource_bloom').length === 0 && Math.random() < 0.00015) {
+      if (nextCosmicEvents.filter(e => e.type === 'black_hole').length === 0 && Math.random() < BLACK_HOLE_SPAWN_CHANCE) {
         nextCosmicEvents.push({
-          id: `bloom_${Date.now()}`,
-          type: 'resource_bloom',
+          id: `blackhole_${Date.now()}`,
+          type: 'black_hole',
           x: (Math.random() - 0.5) * worldRadius,
           y: (Math.random() - 0.5) * worldRadius,
-          radius: 120,
-          strength: BLOOM_SPAWN_MULTIPLIER,
-          duration: BLOOM_DURATION_TICKS,
+          radius: Math.random() * 20 + 30, // 30-50 radius
+          strength: BLACK_HOLE_PULL_STRENGTH,
+          duration: BLACK_HOLE_DURATION_TICKS,
         });
-        nextState.notifications.push('A bloom of cosmic resources has appeared!');
+        nextState.notifications.push('A tear in spacetime appears...');
       }
       
       // 2. Update and remove events
@@ -259,13 +287,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
         
         if(event.type === 'resource_bloom' && duration > 0) {
-            if(Math.random() < (event.strength / 1000)) {
+            if(Math.random() < ((event.strength || 1) / 1000)) {
                 const angle = Math.random() * 2 * Math.PI;
-                const dist = Math.random() * event.radius;
+                const dist = Math.random() * (event.radius || 1);
                 newEnergyOrbs.push({
                     id: `orb_event_${Date.now()}_${Math.random()}`,
-                    x: event.x + Math.cos(angle) * dist,
-                    y: event.y + Math.sin(angle) * dist,
+                    x: (event.x || 0) + Math.cos(angle) * dist,
+                    y: (event.y || 0) + Math.sin(angle) * dist,
                     vx: (Math.random() - 0.5) * 0.5,
                     vy: (Math.random() - 0.5) * 0.5,
                     radius: 5,
@@ -294,18 +322,30 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         });
 
-        // Pull from anomalies
+        // Pull from cosmic events
         nextState.cosmicEvents.forEach(event => {
-            if (event.type === 'gravitational_anomaly') {
-                const dx = event.x - node.x;
-                const dy = event.y - node.y;
-                const distSq = dx * dx + dy * dy;
+            const dx = (event.x || 0) - node.x;
+            const dy = (event.y || 0) - node.y;
+            const distSq = dx * dx + dy * dy;
+
+            if (event.type === 'gravitational_anomaly' && event.radius && event.strength) {
                 if (distSq < event.radius * event.radius) {
                     const dist = Math.sqrt(distSq);
                     const force = event.strength * (1 - dist / event.radius);
                     node.vx += (dx / dist) * force;
                     node.vy += (dy / dist) * force;
                 }
+            } else if (event.type === 'black_hole' && event.radius && event.strength) {
+                 if (distSq < (event.radius * 10) * (event.radius * 10)) { // Large influence radius
+                    const dist = Math.sqrt(distSq);
+                    if (dist < event.radius) {
+                        nodesToRemove.add(node.id); // Consumed by the black hole
+                    } else {
+                        const force = event.strength / distSq;
+                        node.vx += (dx / dist) * force;
+                        node.vy += (dy / dist) * force;
+                    }
+                 }
             }
         });
         
@@ -339,6 +379,61 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             });
         }
       });
+      
+      // Filter out removed nodes
+      if (nodesToRemove.size > 0) {
+        mutableNodes = mutableNodes.filter(n => !nodesToRemove.has(n.id));
+        if (nodesToRemove.has(nextState.selectedNodeId || '')) {
+          nextState.selectedNodeId = null; // Deselect node if it gets destroyed
+        }
+      }
+
+      // --- PHAGE MANAGEMENT ---
+      let nextPhages = [...nextState.phages];
+      let phageSpawnChance = PHAGE_SPAWN_CHANCE;
+      if (nextState.karma < CHAOS_THRESHOLD) phageSpawnChance *= 10; // Chaos dramatically increases phage threat
+      
+      if (Math.random() < phageSpawnChance && mutableNodes.length > 2) {
+         const spawnEdge = Math.random() * 4;
+         let x, y;
+         if (spawnEdge < 1) { x = Math.random() * worldRadius * 2 - worldRadius; y = -worldRadius; } 
+         else if (spawnEdge < 2) { x = worldRadius; y = Math.random() * worldRadius * 2 - worldRadius; } 
+         else if (spawnEdge < 3) { x = Math.random() * worldRadius * 2 - worldRadius; y = worldRadius; } 
+         else { x = -worldRadius; y = Math.random() * worldRadius * 2 - worldRadius; }
+         
+         nextPhages.push({
+             id: `phage_${Date.now()}`, x, y, vx: 0, vy: 0, radius: 8, targetNodeId: null, state: 'seeking',
+         });
+         audioService.playSound('phage_spawn');
+      }
+
+      nextPhages.forEach(phage => {
+          if (phage.state === 'seeking' || !phage.targetNodeId || !mutableNodes.find(n => n.id === phage.targetNodeId)) {
+              let closestNode: GameNode | null = null;
+              let minDistance = Infinity;
+              mutableNodes.forEach(node => {
+                  if (node.type === 'player_consciousness') return;
+                  const d = Math.hypot(node.x - phage.x, node.y - phage.y);
+                  if (d < minDistance) { minDistance = d; closestNode = node; }
+              });
+              phage.targetNodeId = closestNode ? closestNode.id : null;
+          }
+
+          const target = mutableNodes.find(n => n.id === phage.targetNodeId);
+          if (target) {
+              const dist = Math.hypot(target.x - phage.x, target.y - phage.y);
+              if (dist < target.radius) {
+                  phage.state = 'draining';
+                  phage.vx = 0; phage.vy = 0;
+              } else {
+                  phage.vx += (target.x - phage.x) / dist * PHAGE_ATTRACTION;
+                  phage.vy += (target.y - phage.y) / dist * PHAGE_ATTRACTION;
+              }
+          }
+          phage.x += phage.vx; phage.y += phage.vy;
+          phage.vx *= 0.99; phage.vy *= 0.99;
+      });
+      nextState.phages = nextPhages;
 
       // --- PLAYER LOGIC ---
       const playerNode = mutableNodes.find(n => n.type === 'player_consciousness');
@@ -422,14 +517,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'PURCHASE_UPGRADE': {
       const { upgrade, imageUrl } = action.payload;
       let nextState = { ...state };
-      // Type-safe resource subtraction
-      const cost = upgrade.cost;
-      if (cost.energy !== undefined) nextState.energy -= cost.energy;
-      if (cost.knowledge !== undefined) nextState.knowledge -= cost.knowledge;
-      if (cost.biomass !== undefined) nextState.biomass -= cost.biomass;
-      if (cost.unity !== undefined) nextState.unity -= cost.unity;
-      if (cost.complexity !== undefined) nextState.complexity -= cost.complexity;
-      if (cost.data !== undefined) nextState.data -= cost.data;
+      // FIX: Replaced the Object.entries loop with a type-safe for...of loop to correctly subtract resource costs without causing a type error.
+      for (const resource of Object.keys(upgrade.cost) as Array<keyof typeof upgrade.cost>) {
+        const value = upgrade.cost[resource];
+        if (value !== undefined) {
+          (nextState as any)[resource] -= value;
+        }
+      }
       nextState.unlockedUpgrades = new Set(nextState.unlockedUpgrades).add(upgrade.id);
       nextState = upgrade.effect(nextState, imageUrl);
 
@@ -496,8 +590,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               break;
           case 'aiming':
               nextProjectionState.phase = 'charging';
-              nextProjectionState.power = 0;
-              nextProjectionState.powerDirection = 1;
+              nextProjectionState.power = 0.5; // Start at a default power
               if (state.tutorialStep === 1) nextState = gameReducer(nextState, {type: 'ADVANCE_TUTORIAL'});
               break;
           case 'charging':
@@ -617,26 +710,33 @@ const App: React.FC = () => {
   
   // Memoize HUD values to prevent re-renders
   const chapterInfo = useMemo(() => CHAPTERS[gameState.currentChapter], [gameState.currentChapter]);
+  const karmaIndicatorPosition = useMemo(() => `${(gameState.karma + 100) / 2}%`, [gameState.karma]);
+  
+  const chapterUpgrades = useMemo(() => UPGRADES.filter(u => u.chapter === gameState.currentChapter), [gameState.currentChapter]);
+  const unlockedChapterUpgrades = useMemo(() => chapterUpgrades.filter(u => gameState.unlockedUpgrades.has(u.id)).length, [chapterUpgrades, gameState.unlockedUpgrades]);
+  const chapterProgress = useMemo(() => chapterUpgrades.length > 0 ? (unlockedChapterUpgrades / chapterUpgrades.length) * 100 : 0, [unlockedChapterUpgrades, chapterUpgrades.length]);
 
   if (!gameState.gameStarted) {
     return <SplashScreen onStartGame={startGame} onLoadGame={loadGame} dispatch={dispatch} settings={gameState.settings} />;
   }
 
   return (
-    <div className={`app-container colorblind-${gameState.settings.colorblindMode}`} style={{'--shake-intensity': `${gameState.screenShake.intensity}px`} as React.CSSProperties}>
-      <BackgroundEffects gameState={gameState} dimensions={dimensions} />
-      <KarmaParticles karma={gameState.karma} width={dimensions.width} height={dimensions.height} />
-      
-      <Simulation 
-        gameState={gameState} 
-        dispatch={dispatch} 
-        dimensions={dimensions} 
-        isZoomingOut={gameState.levelTransitionState === 'zooming'}
-        transform={transform}
-        worldScaleHandlers={{handleWheel, handleMouseDown, handleMouseUp, handleMouseMove}}
-        screenToWorld={screenToWorld}
-        isPanningRef={isPanningRef}
-      />
+    <>
+      <div className={`app-container colorblind-${gameState.settings.colorblindMode} ${gameState.screenShake.duration > 0 ? 'shaking' : ''}`} style={{'--shake-intensity': `${gameState.screenShake.intensity}px`} as React.CSSProperties}>
+        <BackgroundEffects gameState={gameState} dimensions={dimensions} />
+        <KarmaParticles karma={gameState.karma} width={dimensions.width} height={dimensions.height} />
+        
+        <Simulation 
+          gameState={gameState} 
+          dispatch={dispatch} 
+          dimensions={dimensions} 
+          isZoomingOut={gameState.levelTransitionState === 'zooming'}
+          transform={transform}
+          worldScaleHandlers={{handleWheel, handleMouseDown, handleMouseUp, handleMouseMove}}
+          screenToWorld={screenToWorld}
+          isPanningRef={isPanningRef}
+        />
+      </div>
       
       <div className="hud-container">
           <div className="hud-top-bar">
@@ -655,6 +755,26 @@ const App: React.FC = () => {
                   <div className="hud-chapter-info">
                       <h2>{chapterInfo.name}</h2>
                       <p>Chapter {chapterInfo.id + 1}</p>
+                  </div>
+                   <div className="hud-chapter-progress-bar" title={`Chapter Progress: ${chapterProgress.toFixed(0)}%`}>
+                      <div className="hud-chapter-progress-fill" style={{ width: `${chapterProgress}%` }} />
+                   </div>
+                   <div className="hud-karma-meter">
+                        <div className="karma-labels">
+                            <span className="karma-label-chaos">Chaos</span>
+                            <span className="karma-label-harmony">Harmony</span>
+                        </div>
+                        <div className="karma-bar-bg">
+                            <div className="karma-indicator" style={{ left: karmaIndicatorPosition }} />
+                        </div>
+                   </div>
+                   <div className="text-center h-5 mt-1">
+                      {gameState.karma > HARMONY_THRESHOLD && (
+                          <p className="text-xs text-cyan-300 animate-pulse">Harmony's Favor</p>
+                      )}
+                      {gameState.karma < CHAOS_THRESHOLD && (
+                          <p className="text-xs text-pink-400 animate-pulse">Chaotic Influence</p>
+                      )}
                   </div>
               </div>
 
@@ -692,7 +812,7 @@ const App: React.FC = () => {
       {gameState.activeCrossroadsEvent && <CrossroadsModal event={gameState.activeCrossroadsEvent} dispatch={dispatch} />}
       {gameState.activeChapterTransition && <ChapterTransition chapterId={gameState.activeChapterTransition} dispatch={dispatch} />}
       {gameState.levelTransitionState !== 'none' && <LevelTransition levelState={gameState.levelTransitionState} zoomLevel={gameState.zoomLevel} dispatch={dispatch} />}
-    </div>
+    </>
   );
 };
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upgrade, GameState, NodeType } from '../types';
 import { getGeminiFlavorText, generateNodeImage } from '../services/geminiService';
-import { getNodeImagePrompt } from '../promptService';
+import { getNodeImagePrompt } from '../services/promptService';
 
 interface UpgradeCardProps {
   upgrade: Upgrade;

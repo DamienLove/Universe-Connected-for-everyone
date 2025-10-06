@@ -1,28 +1,26 @@
 
 import React, { useReducer, useState, useEffect, useCallback, useMemo } from 'react';
 import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, PlayerState, ProjectionState, CollectionBloom, CollectionFlare, WorldTransform } from '../types';
-// FIX: Corrected typo from UPGRADADES to UPGRADES.
 import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS } from './constants';
-import { useGameLoop } from '../services/useGameLoop';
+import { useGameLoop } from '../hooks/useGameLoop';
 import { audioService } from '../services/AudioService';
-import { getNodeImagePrompt } from '../promptService';
-import { generateNodeImage } from '../services/geminiService';
+import { getNodeImagePrompt } from '../services/promptService';
+import { generateNodeImage, getGeminiLoreForNode } from '../services/geminiService';
 import { useWorldScale } from '../hooks/useWorldScale';
 
 import Simulation from './Simulation';
-import UpgradeModal from '../UpgradeModal';
-import Notification from '../Notification';
+import UpgradeModal from './UpgradeModal';
+import Notification from './Notification';
 import Tutorial from './Tutorial';
 import MilestoneVisual from './MilestoneVisual';
 import SplashScreen from './SplashScreen';
 import KarmaParticles from '../hooks/KarmaParticles';
-import BackgroundEffects from '../services/BackgroundEffects';
-import CrossroadsModal from '../CrossroadsModal';
+import BackgroundEffects from './BackgroundEffects';
+import CrossroadsModal from './CrossroadsModal';
 import NodeInspector from './NodeInspector';
 import ChapterTransition from './ChapterTransition';
 import LevelTransition from './LevelTransition';
 import SettingsModal from './SettingsModal';
-import { getGeminiLoreForNode } from '../services/geminiService';
 
 
 // Constants for game balance

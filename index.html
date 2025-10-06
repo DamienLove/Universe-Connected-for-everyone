@@ -586,13 +586,23 @@
       border-radius: 8px;
       box-shadow: 0 0 15px rgba(0, 246, 255, 0.1);
     }
+
+    .hud-top-bar {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        right: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+    }
     
     .hud-resources {
-      position: absolute;
-      top: 1rem; left: 1rem;
       display: flex;
       flex-direction: row;
       gap: 1rem;
+      flex-wrap: wrap; /* Allow wrapping on small screens */
     }
     .hud-resource-item {
       display: flex;
@@ -608,14 +618,17 @@
     }
     
     .hud-top-center {
-      position: absolute;
-      top: 1rem;
-      left: 50%;
-      transform: translateX(-50%);
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 0.5rem;
+    }
+
+    .hud-notifications {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
     }
 
     .hud-chapter-info {
@@ -1232,7 +1245,6 @@
         from { transform: scale(0.1) rotate(-180deg); opacity: 0; filter: blur(20px); }
         to { transform: scale(1) rotate(0deg); opacity: 1; filter: blur(2px); }
     }
-    
     /* Pause Overlay */
     .pause-overlay {
         position: fixed;

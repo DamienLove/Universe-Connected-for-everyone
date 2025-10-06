@@ -1,5 +1,5 @@
 import React, { useReducer, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, WorldTransform, ProjectionState } from '../types';
+import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, WorldTransform, ProjectionState, CollectedItem } from '../types';
 import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS, NODE_IMAGE_MAP } from './constants';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { audioService } from '../services/AudioService';
@@ -74,6 +74,9 @@ const initialState: GameState = {
   complexity: 0,
   data: 0,
   karma: 0,
+  inventory: [
+    { id: 'stabilizer_1', name: 'Quantum Stabilizer', description: 'Temporarily boosts resource gain from anomalies.', icon: 'stabilizer' }
+  ],
   unlockedUpgrades: new Set(),
   currentChapter: 0,
   tutorialStep: 0,
@@ -670,6 +673,23 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         return { ...state, settings: newSettings };
     }
+    case 'USE_ITEM': {
+        const { itemId } = action.payload;
+        const item = state.inventory.find(i => i.id === itemId);
+        if (!item) return state;
+
+        let nextState = { ...state };
+        // Placeholder effect
+        if (item.name === 'Quantum Stabilizer') {
+            nextState.notifications = [...nextState.notifications, 'Quantum fields stabilized!'];
+        }
+        // Remove the item after use
+        nextState.inventory = state.inventory.filter(i => i.id !== itemId);
+        
+        // audioService.playSound('use_item'); // TODO: Add sound for this
+        
+        return nextState;
+    }
     case 'SAVE_GAME': {
         try {
             const stateToSave = { ...state, unlockedUpgrades: Array.from(state.unlockedUpgrades) };
@@ -825,16 +845,28 @@ const App: React.FC = () => {
                 ))}
               </div>
           </div>
-
-          <div className="hud-zoom-controls">
-            <button onClick={() => zoom(1.2)} className="zoom-button" aria-label="Zoom In">+</button>
-            <button onClick={() => zoom(1 / 1.2)} className="zoom-button" aria-label="Zoom Out">-</button>
-          </div>
-
-          <div className="hud-action-buttons">
-              <button onClick={() => setUpgradeModalOpen(true)} className="action-button">UPGRADES</button>
-              <button onClick={() => setSettingsModalOpen(true)} className="action-button purple">OPTIONS</button>
-              <button onClick={() => dispatch({type: 'SET_PAUSED', payload: !gameState.isPaused})} className="action-button blue">PAUSE</button>
+          
+          <div className="hud-bottom-right-container">
+            <div className="hud-inventory-bar">
+              {gameState.inventory.map(item => (
+                <button
+                  key={item.id}
+                  className={`inventory-item icon-${item.icon}`}
+                  title={`${item.name}: ${item.description}`}
+                  onClick={() => dispatch({ type: 'USE_ITEM', payload: { itemId: item.id }})}
+                  aria-label={`Use ${item.name}`}
+                />
+              ))}
+            </div>
+            <div className="hud-action-buttons">
+                <button onClick={() => setUpgradeModalOpen(true)} className="action-button">UPGRADES</button>
+                <button onClick={() => setSettingsModalOpen(true)} className="action-button purple">OPTIONS</button>
+                <button onClick={() => dispatch({type: 'SET_PAUSED', payload: !gameState.isPaused})} className="action-button blue">PAUSE</button>
+            </div>
+             <div className="hud-zoom-controls">
+                <button onClick={() => zoom(1.2)} className="zoom-button" aria-label="Zoom In">+</button>
+                <button onClick={() => zoom(1 / 1.2)} className="zoom-button" aria-label="Zoom Out">-</button>
+            </div>
           </div>
       </div>
       

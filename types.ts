@@ -115,6 +115,13 @@ export interface CosmicEvent {
   phase?: 'warning' | 'active'; // For multi-stage events like supernova
 }
 
+export interface CollectedItem {
+  id: string;
+  name: string;
+  description: string;
+  icon: string; // An identifier for the icon, e.g., a class name
+}
+
 export interface GameState {
   // Game state
   gameStarted: boolean;
@@ -128,6 +135,9 @@ export interface GameState {
   complexity: number;
   data: number;
   karma: number; // -100 (chaos) to 100 (harmony)
+  
+  // Inventory
+  inventory: CollectedItem[];
 
   // Game Progression
   unlockedUpgrades: Set<string>;
@@ -260,6 +270,7 @@ export type GameAction =
   | { type: 'COMPLETE_LEVEL_TRANSITION' }
   | { type: 'UPDATE_NODE_IMAGE'; payload: { nodeId: string, imageUrl: string } }
   | { type: 'END_CHAPTER_TRANSITION' }
+  | { type: 'USE_ITEM'; payload: { itemId: string } }
   // Player Control Actions
   | { type: 'START_AIMING' }
   | { type: 'SET_DIRECTION' }

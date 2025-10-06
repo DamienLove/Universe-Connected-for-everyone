@@ -99,8 +99,12 @@ export const generateNodeImage = async (prompt: string): Promise<string | null> 
         }
         console.warn("The image generation API did not return an image. This might be due to safety filters or a transient issue.");
         return null;
-    } catch (error) {
-        console.error(`Error generating image:`, error);
+    } catch (error: any) {
+        // Don't log an error if it's just an invalid API key, which is expected in local dev.
+        const errorMessage = error?.message || '';
+        if (!errorMessage.includes("API key not valid")) {
+            console.error(`Error generating image:`, error);
+        }
         // Return null to allow for graceful fallback instead of throwing an error.
         return null;
     }

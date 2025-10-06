@@ -227,7 +227,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
           nextState.screenShake = { intensity: 20, duration: 30 };
           audioService.playSound('phage_spawn'); // Placeholder for explosion
-          // FIX: Added 'as const' to prevent the type of 'phase' from being widened to 'string', ensuring compatibility with the 'CosmicEvent' type.
           return { ...event, phase: 'active' as const, duration: SUPERNOVA_EXPLOSION_TICKS };
         }
         
@@ -392,13 +391,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'PURCHASE_UPGRADE': {
       const { upgrade, imageUrl } = action.payload;
       let nextState = { ...state };
-      // FIX: Replaced the Object.entries loop with a type-safe for...of loop to correctly subtract resource costs without causing a type error.
-      for (const resource of Object.keys(upgrade.cost) as Array<keyof typeof upgrade.cost>) {
-        const value = upgrade.cost[resource];
-        if (value !== undefined) {
-          (nextState as any)[resource] -= value;
-        }
-      }
+      // Type-safe resource subtraction
+      const cost = upgrade.cost;
+      if (cost.energy !== undefined) nextState.energy -= cost.energy;
+      if (cost.knowledge !== undefined) nextState.knowledge -= cost.knowledge;
+      if (cost.biomass !== undefined) nextState.biomass -= cost.biomass;
+      if (cost.unity !== undefined) nextState.unity -= cost.unity;
+      if (cost.complexity !== undefined) nextState.complexity -= cost.complexity;
+      if (cost.data !== undefined) nextState.data -= cost.data;
       nextState.unlockedUpgrades = new Set(nextState.unlockedUpgrades).add(upgrade.id);
       nextState = upgrade.effect(nextState, imageUrl);
 

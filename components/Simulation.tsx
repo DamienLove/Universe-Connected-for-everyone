@@ -10,7 +10,6 @@ import RadialMenu from './RadialMenu';
 import LoreTooltip from './LoreTooltip';
 import { getGeminiLoreForNode } from '../services/geminiService';
 import { CHAPTERS } from './constants';
-import ProjectileHUD from './ProjectileHUD';
 
 interface SimulationProps {
   gameState: GameState;
@@ -112,13 +111,6 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
       onClick={handleContainerClick}
       style={{ cursor: isPanningRef.current ? 'grabbing' : 'crosshair' }}
     >
-      <ProjectileHUD
-        playerNode={playerNode}
-        projectionState={gameState.projection}
-        transform={transform}
-        aimAssistTargetId={gameState.aimAssistTargetId}
-        nodes={gameState.nodes}
-      />
       <div
         className={`world-container ${isZoomingOut ? 'level-zoom-out' : ''}`}
         style={{
@@ -164,6 +156,36 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
         </svg>
 
         {/* --- Player Projection UI --- */}
+        {playerNode && gameState.projection.playerState === 'AIMING_DIRECTION' && (
+             <div
+                id="aim-indicator"
+                className={`aim-indicator ${lockedOnTarget ? 'locked-on' : ''}`}
+                style={{
+                    left: `${playerNode.x}px`, top: `${playerNode.y}px`,
+                    width: '300px',
+                    transform: `rotate(${aimAngle}rad)`,
+                }}
+            />
+        )}
+         {playerNode && gameState.projection.playerState === 'AIMING_POWER' && (
+            <div id="power-meter-container" style={{ left: `${playerNode.x}px`, top: `${playerNode.y}px` }}>
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle cx="80" cy="80" r="70" className="power-meter-bg" strokeWidth="4" fill="none" />
+                    <circle
+                        cx="80" cy="80" r="70"
+                        className="power-meter-fg"
+                        strokeWidth="5"
+                        fill="none"
+                        strokeDasharray={2 * Math.PI * 70}
+                        strokeDashoffset={(2 * Math.PI * 70) * (1 - gameState.projection.power / 100)}
+                        transform="rotate(-90 80 80)"
+                    />
+                    <text x="80" y="80" className="power-meter-text" textAnchor="middle" dominantBaseline="central" fill="white">
+                        {Math.round(gameState.projection.power)}%
+                    </text>
+                </svg>
+            </div>
+        )}
         {gameState.projectileTrailParticles.map(p => (
             <div key={p.id} className="projectile-trail-particle" style={{
                 left: p.x, top: p.y,

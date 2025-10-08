@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { CrossroadsEvent, GameAction, GameState } from '../types';
 

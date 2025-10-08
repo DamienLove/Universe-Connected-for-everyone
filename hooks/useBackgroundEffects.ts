@@ -1,4 +1,3 @@
-
 import { useRef, useMemo, useCallback } from 'react';
 
 // For twinkling stars

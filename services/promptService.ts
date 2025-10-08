@@ -1,3 +1,4 @@
+
 import { NodeType } from '../types';
 
 const BASE_STYLE = "Epic realistic photograph, cosmic beauty, cinematic lighting, ultra-detailed, vibrant swirling nebula background, NASA photograph style, centered, view from deep space.";

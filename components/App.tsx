@@ -137,7 +137,18 @@ const initialState: GameState = {
 
 const HARMONY_THRESHOLD = 50;
 const CHAOS_THRESHOLD = -50;
+function App() {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
+  return (
+    <div>
+      <h1>My App</h1>
+      <p>Your API Key is: {apiKey ? 'Loaded' : 'Not found'}</p>
+    </div>
+  );
+}
+
+export default App;
 // The main game reducer
 function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {

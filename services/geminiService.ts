@@ -5,7 +5,7 @@ import { GameNode, Chapter } from '../types';
 
 // Always use new GoogleGenAI({apiKey: process.env.API_KEY});
 // The API key MUST be obtained exclusively from the environment variable `process.env.API_KEY`.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as string });
 
 export const getGeminiFlavorText = async (concept: string): Promise<string> => {
   try {

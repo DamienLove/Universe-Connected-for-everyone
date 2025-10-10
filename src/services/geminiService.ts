@@ -3,9 +3,12 @@ import { GoogleGenAI } from "@google/genai";
 import { GameNode, Chapter } from '../types';
 
 
-// Always use new GoogleGenAI({apiKey: process.env.API_KEY});
-// The API key MUST be obtained exclusively from the environment variable `process.env.API_KEY`.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+// The API key is now accessed via import.meta.env, which Vite replaces during the build process.
+const apiKey = import.meta.env.VITE_API_KEY as string;
+if (!apiKey) {
+  throw new Error("VITE_API_KEY environment variable not set");
+}
+const ai = new GoogleGenAI({ apiKey });
 
 export const getGeminiFlavorText = async (concept: string): Promise<string> => {
   try {

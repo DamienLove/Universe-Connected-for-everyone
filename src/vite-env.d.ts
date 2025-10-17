@@ -5,7 +5,9 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_KEY: string;
-  // Add other environment variables used in the app here.
+  readonly VITE_GEMINI_API_KEY: string;
+  readonly VITE_SUPABASE_URL: string;
+  readonly VITE_SUPABASE_ANON_KEY: string;
 }
 
 interface ImportMeta {

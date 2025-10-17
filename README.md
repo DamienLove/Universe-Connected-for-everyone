@@ -1,20 +1,53 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Universe Connected Game
 
-# Run and deploy your AI Studio app
+A cosmic evolution game inspired by "Universe Connected for Everyone" by Damien Nichols.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/drive/1SvaFe-mbV5o1Z0yMV8IsS8Srbl6b91Wy
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+## Setup
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Configure your Gemini API key in `.env`:
+   ```
+   VITE_GEMINI_API_KEY=your_api_key_here
+   ```
+
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Build for production:
+   ```bash
+   npm run build
+   ```
+
+## Building APK
+
+To build this as an Android APK, you'll need to use a tool like Capacitor:
+
+1. Install Capacitor:
+   ```bash
+   npm install @capacitor/core @capacitor/cli @capacitor/android
+   npx cap init
+   ```
+
+2. Build the web app:
+   ```bash
+   npm run build
+   ```
+
+3. Add Android platform:
+   ```bash
+   npx cap add android
+   ```
+
+4. Sync and open in Android Studio:
+   ```bash
+   npx cap sync
+   npx cap open android
+   ```
+
+5. Build APK from Android Studio

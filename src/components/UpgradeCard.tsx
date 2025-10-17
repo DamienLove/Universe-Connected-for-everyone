@@ -1,9 +1,8 @@
-
-
 import React, { useState, useEffect } from 'react';
-import { Upgrade, GameState } from '../types';
-import { getGeminiFlavorText } from '../services/geminiService';
+import { Upgrade, GameState, NodeType } from '../types';
+import { getGeminiFlavorText, generateNodeImage } from '../services/geminiService';
 import { NODE_IMAGE_MAP } from './constants';
+import { getNodeImagePrompt } from '../services/promptService';
 
 interface UpgradeCardProps {
   upgrade: Upgrade;
@@ -16,6 +15,7 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
   const [isExpanded, setIsExpanded] = useState(false);
   const [flavorText, setFlavorText] = useState<string>('');
   const [isLoadingFlavorText, setIsLoadingFlavorText] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   useEffect(() => {
     if (isExpanded && !flavorText && !isLoadingFlavorText) {
@@ -34,17 +34,24 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
     }
   }, [isExpanded, flavorText, isLoadingFlavorText, upgrade.title]);
 
-  const handlePurchase = (e: React.MouseEvent) => {
+  const handlePurchase = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isPurchaseable(upgrade)) return;
+    if (!isPurchaseable(upgrade) || isGeneratingImage) return;
 
     const nodeTypeToGenerate = upgrade.generatesNodeType || upgrade.modifiesNodeTypeTarget;
     let imageUrl: string | undefined;
 
     if (nodeTypeToGenerate) {
-        const images = NODE_IMAGE_MAP[nodeTypeToGenerate];
-        if (images && images.length > 0) {
-            imageUrl = images[Math.floor(Math.random() * images.length)];
+        setIsGeneratingImage(true);
+        try {
+            const prompt = getNodeImagePrompt(nodeTypeToGenerate);
+            const generatedUrl = await generateNodeImage(prompt);
+            imageUrl = generatedUrl || NODE_IMAGE_MAP[nodeTypeToGenerate]?.[0];
+        } catch (error) {
+            console.error("Image generation failed, using fallback.", error);
+            imageUrl = NODE_IMAGE_MAP[nodeTypeToGenerate]?.[0];
+        } finally {
+            setIsGeneratingImage(false);
         }
     }
     onPurchase(upgrade, imageUrl);
@@ -64,6 +71,7 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
   const buttonText = () => {
       if (unlocked) return 'Unlocked';
       if (exclusiveLock) return 'Path Not Chosen';
+      if (isGeneratingImage) return 'Generating...';
       return 'Unlock';
   }
 
@@ -82,7 +90,7 @@ const UpgradeCard: React.FC<UpgradeCardProps> = ({ upgrade, gameState, onPurchas
         </div>
         <button
           onClick={handlePurchase}
-          disabled={!canBuy || unlocked || exclusiveLock}
+          disabled={!canBuy || unlocked || exclusiveLock || isGeneratingImage}
           className={`px-4 py-2 rounded transition-colors ml-4 whitespace-nowrap ${
             unlocked ? 'bg-gray-600 cursor-not-allowed' :
             exclusiveLock ? 'bg-red-900 text-gray-500 cursor-not-allowed' :

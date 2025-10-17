@@ -1,8 +1,9 @@
 import React, { useReducer, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { GameState, GameAction, EnergyOrb, GameNode, ProjectionState } from '../types';
-import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, NODE_IMAGE_MAP } from './constants';
+import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, WorldTransform, ProjectionState, CollectedItem } from '../types';
+import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS, NODE_IMAGE_MAP } from './constants';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { audioService } from '../services/AudioService';
+import { generateNodeImage, getGeminiLoreForNode } from '../services/geminiService';
 import { useWorldScale } from '../hooks/useWorldScale';
 
 import Simulation from './Simulation';
@@ -18,6 +19,7 @@ import NodeInspector from './NodeInspector';
 import ChapterTransition from './ChapterTransition';
 import LevelTransition from './LevelTransition';
 import SettingsModal from './SettingsModal';
+import { getNodeImagePrompt } from '../services/promptService';
 
 
 // Constants for game balance
@@ -29,6 +31,8 @@ const DATA_GENERATION_RATE = 0.2;
 const STAR_ORB_SPAWN_CHANCE = 0.005;
 const PHAGE_SPAWN_CHANCE = 0.0001;
 const PHAGE_ATTRACTION = 0.01;
+const PHAGE_DRAIN_RATE = 0.5;
+const PLAYER_HUNT_RANGE = 150;
 const SUPERNOVA_WARNING_TICKS = 1800; // 30 seconds at 60fps
 const SUPERNOVA_EXPLOSION_TICKS = 120; // 2 seconds
 const ANOMALY_DURATION_TICKS = 1200; // 20 seconds
@@ -39,15 +43,17 @@ const BLACK_HOLE_SPAWN_CHANCE = 0.00005;
 const BLACK_HOLE_DURATION_TICKS = 3600; // 1 minute
 const BLACK_HOLE_PULL_STRENGTH = 100;
 
-const AIM_ROTATION_SPEED = 0.01; // Radians per tick
+const AIM_ROTATION_SPEED = 0.05; // Radians per tick
 const POWER_OSCILLATION_SPEED = 1.5; // From 0 to 100
 const MAX_LAUNCH_POWER = 20;
 const PROJECTILE_FRICTION = 0.98;
-const REFORM_DURATION = 120; // 2 seconds
 
 const ORB_COLLECTION_LEEWAY = 10; // Extra radius for easier collection
 const AIM_ASSIST_ANGLE = 0.1; // Radians for snap
 
+const TUNNEL_CHANCE_PER_TICK = 0.0005;
+const TUNNEL_DISTANCE = 400;
+const TUNNEL_DURATION_TICKS = 60; // 1 second
 
 const SAVE_GAME_KEY = 'universe-connected-save';
 
@@ -55,7 +61,6 @@ const initialProjectionState: ProjectionState = {
   playerState: 'IDLE',
   aimAngle: 0,
   power: 0,
-  reformTimer: 0,
 };
 
 const initialState: GameState = {
@@ -91,6 +96,7 @@ const initialState: GameState = {
       radius: 20,
       connections: [],
       hasLife: false,
+      imageUrl: NODE_IMAGE_MAP.player_consciousness[0], // Placeholder
     },
     {
       id: 'tutorial_planet',
@@ -103,6 +109,7 @@ const initialState: GameState = {
       radius: 15,
       connections: [],
       hasLife: false,
+      imageUrl: NODE_IMAGE_MAP.rocky_planet[0], // Placeholder
     },
   ],
   phages: [],
@@ -154,7 +161,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'TICK': {
       if (state.isPaused) return state;
       let nextState = { ...state };
-      const { width, height } = action.payload;
+      const { width, height, transform } = action.payload;
       const worldRadius = (Math.min(width, height) * 1.5) / (state.zoomLevel + 1);
       
       let mutableNodes = nextState.nodes.map(n => ({...n}));
@@ -193,8 +200,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   const dist = Math.hypot(playerNode.x - node.x, playerNode.y - node.y);
                   if (dist < playerNode.radius + node.radius) {
                       playerNode.vx = 0; playerNode.vy = 0;
-                      nextState.projection.playerState = 'REFORMING';
-                      nextState.projection.reformTimer = REFORM_DURATION;
+                      nextState.projection.playerState = 'IDLE';
 
                       // Resource absorption based on node type
                       let energyGain = 0, knowledgeGain = 0, biomassGain = 0, unityGain = 0, complexityGain = 0;
@@ -219,17 +225,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               if (Math.hypot(playerNode.vx, playerNode.vy) < 0.1) {
                   playerNode.vx = 0;
                   playerNode.vy = 0;
-                  nextState.projection.playerState = 'REFORMING';
-                  nextState.projection.reformTimer = REFORM_DURATION;
+                  nextState.projection.playerState = 'IDLE';
               }
               break;
             }
-            case 'REFORMING':
-              nextState.projection.reformTimer--;
-              if (nextState.projection.reformTimer <= 0) {
-                nextState.projection.playerState = 'IDLE';
-              }
-              break;
           }
       }
 
@@ -498,17 +497,14 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       nextPhages.forEach(phage => {
           if (phage.state === 'seeking' || !phage.targetNodeId || !mutableNodes.find(n => n.id === phage.targetNodeId)) {
-              let closestNode: GameNode | undefined = undefined;
+              let closestNode: GameNode | null = null;
               let minDistance = Infinity;
-              for (const node of mutableNodes) {
-                  if (node.type === 'player_consciousness') continue;
+              mutableNodes.forEach(node => {
+                  if (node.type === 'player_consciousness') return;
                   const d = Math.hypot(node.x - phage.x, node.y - phage.y);
-                  if (d < minDistance) {
-                      minDistance = d;
-                      closestNode = node;
-                  }
-              }
-              phage.targetNodeId = closestNode?.id || null;
+                  if (d < minDistance) { minDistance = d; closestNode = node; }
+              });
+              phage.targetNodeId = closestNode ? closestNode.id : null;
           }
 
           const target = mutableNodes.find(n => n.id === phage.targetNodeId);
@@ -661,6 +657,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
         return { ...state, tutorialStep: nextTutorialStep3, nodes: newNodes, projection: { ...state.projection, playerState: 'PROJECTING', power: 0 }};
     }
+     case 'UPDATE_NODE_IMAGE': {
+        const { nodeId, imageUrl } = action.payload;
+        return {
+            ...state,
+            nodes: state.nodes.map(node =>
+                node.id === nodeId ? { ...node, imageUrl } : node
+            ),
+        };
+    }
     case 'CHANGE_SETTING': {
         const { key, value } = action.payload;
         const newSettings = { ...state.settings, [key]: value };
@@ -749,10 +754,23 @@ const App: React.FC = () => {
 
   useGameLoop(dispatch, dimensions, gameState.isPaused, transform);
 
-  const startGame = useCallback(() => {
-    const playerImages = NODE_IMAGE_MAP['player_consciousness'];
-    const imageUrl = playerImages[0] || '';
-    dispatch({ type: 'START_GAME', payload: { playerImageUrl: imageUrl } });
+  const startGame = useCallback(async () => {
+    // Generate images for the player and the initial tutorial planet.
+    const playerImagePromise = generateNodeImage(getNodeImagePrompt('player_consciousness'));
+    const planetImagePromise = generateNodeImage(getNodeImagePrompt('rocky_planet'));
+    
+    const [playerImageUrl, planetImageUrl] = await Promise.all([playerImagePromise, planetImagePromise]);
+
+    dispatch({ type: 'START_GAME', payload: { playerImageUrl: playerImageUrl || NODE_IMAGE_MAP.player_consciousness[0] } });
+    
+    // Dispatch a second action to update the tutorial planet's image once the new state is processed.
+    // A small timeout ensures the START_GAME action has been reduced.
+    setTimeout(() => {
+      if (planetImageUrl) {
+        dispatch({ type: 'UPDATE_NODE_IMAGE', payload: { nodeId: 'tutorial_planet', imageUrl: planetImageUrl } });
+      }
+    }, 10);
+
   }, []);
 
   const loadGame = useCallback(() => {
@@ -766,8 +784,8 @@ const App: React.FC = () => {
   const chapterInfo = useMemo(() => CHAPTERS[gameState.currentChapter], [gameState.currentChapter]);
   const karmaIndicatorPosition = useMemo(() => `${(gameState.karma + 100) / 2}%`, [gameState.karma]);
   
-  const chapterUpgrades = useMemo(() => UPGRADES.filter((u: any) => u.chapter === gameState.currentChapter), [gameState.currentChapter]);
-  const unlockedChapterUpgrades = useMemo(() => chapterUpgrades.filter((u: any) => gameState.unlockedUpgrades.has(u.id)).length, [chapterUpgrades, gameState.unlockedUpgrades]);
+  const chapterUpgrades = useMemo(() => UPGRADES.filter(u => u.chapter === gameState.currentChapter), [gameState.currentChapter]);
+  const unlockedChapterUpgrades = useMemo(() => chapterUpgrades.filter(u => gameState.unlockedUpgrades.has(u.id)).length, [chapterUpgrades, gameState.unlockedUpgrades]);
   const chapterProgress = useMemo(() => chapterUpgrades.length > 0 ? (unlockedChapterUpgrades / chapterUpgrades.length) * 100 : 0, [unlockedChapterUpgrades, chapterUpgrades.length]);
 
   if (!gameState.gameStarted) {
@@ -875,7 +893,7 @@ const App: React.FC = () => {
       
       <NodeInspector gameState={gameState} dispatch={dispatch} />
       
-      {isUpgradeModalOpen && <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} gameState={gameState} onPurchase={(upgrade: any, imageUrl: any) => dispatch({type: 'PURCHASE_UPGRADE', payload: {upgrade, imageUrl}})} />}
+      {isUpgradeModalOpen && <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} gameState={gameState} onPurchase={(upgrade, imageUrl) => dispatch({type: 'PURCHASE_UPGRADE', payload: {upgrade, imageUrl}})} />}
       {isSettingsModalOpen && <SettingsModal settings={gameState.settings} dispatch={dispatch} onClose={() => setSettingsModalOpen(false)} />}
       {gameState.tutorialStep !== -1 && <Tutorial step={gameState.tutorialStep} dispatch={dispatch} />}
       {gameState.activeMilestone && <MilestoneVisual milestoneId={gameState.activeMilestone.id} imageUrl={gameState.activeMilestone.imageUrl} onComplete={() => dispatch({type: 'MILESTONE_COMPLETE'})} />}

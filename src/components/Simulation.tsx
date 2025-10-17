@@ -1,10 +1,4 @@
-
-
-
-
-
-
-import React from 'react';
+import React, { useRef } from 'react';
 import { GameAction, GameState, WorldTransform } from '../types';
 import RadialMenu from './RadialMenu';
 import LoreTooltip from './LoreTooltip';
@@ -28,9 +22,8 @@ interface SimulationProps {
 }
 
 const PLAYER_HUNT_RANGE = 150;
-const REFORM_DURATION = 120; // Must match constant in App.tsx
 
-const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions, isZoomingOut, transform, worldScaleHandlers, isPanningRef }) => {
+const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions, isZoomingOut, transform, worldScaleHandlers, screenToWorld, isPanningRef }) => {
   const { width, height } = dimensions;
 
   const playerNode = gameState.nodes.find(n => n.type === 'player_consciousness');
@@ -39,7 +32,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
     dispatch({ type: 'SELECT_NODE', payload: { nodeId } });
   };
   
-  const handlePlayerInteraction = () => {
+  const handlePlayerInteraction = (e: React.MouseEvent) => {
     // This function now handles the entire projection state machine on clicks
     switch (gameState.projection.playerState) {
         case 'IDLE':
@@ -63,7 +56,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
         if(gameState.selectedNodeId) {
             dispatch({ type: 'SELECT_NODE', payload: { nodeId: null } });
         } else {
-             handlePlayerInteraction();
+             handlePlayerInteraction(e);
         }
     }
   };
@@ -193,22 +186,6 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                 transform: `scale(${p.life / 20})`,
             }} />
         ))}
-         {playerNode && gameState.projection.playerState === 'REFORMING' && (
-             <>
-              {Array.from({length: 20}).map((_, i) => {
-                  const angle = (i/20) * Math.PI * 2;
-                  const dist = (gameState.projection.reformTimer / REFORM_DURATION) * 150;
-                  return (
-                      <div key={i} className="reforming-particle" style={{
-                          left: `${playerNode.x}px`, top: `${playerNode.y}px`,
-                          width: '4px', height: '4px',
-                          '--x-start': `${Math.cos(angle) * dist}px`,
-                          '--y-start': `${Math.sin(angle) * dist}px`,
-                      } as React.CSSProperties}/>
-                  );
-              })}
-             </>
-        )}
 
         {/* Render Connection Pulses */}
         {gameState.connectionParticles.map(particle => {
@@ -241,7 +218,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
         {/* Render Cosmic Events */}
         {gameState.cosmicEvents.map(event => {
             if (event.type === 'supernova' && event.phase === 'active') {
-                const baseSize = (event.radius || 50) * 2;
+                const baseSize = event.radius * 2;
                 const containerStyle: React.CSSProperties = {
                     left: `${event.x}px`, top: `${event.y}px`,
                     width: `${baseSize}px`, height: `${baseSize}px`,
@@ -268,7 +245,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                 return (
                      <div key={event.id} className="anomaly-vortex" style={{
                          left: `${event.x}px`, top: `${event.y}px`,
-                         width: `${(event.radius || 100) * 2}px`, height: `${(event.radius || 100) * 2}px`
+                         width: `${event.radius * 2}px`, height: `${event.radius * 2}px`
                      }} />
                 );
             }
@@ -276,7 +253,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                  return (
                      <div key={event.id} className="resource-bloom" style={{
                          left: `${event.x}px`, top: `${event.y}px`,
-                         width: `${(event.radius || 100) * 2}px`, height: `${(event.radius || 100) * 2}px`,
+                         width: `${event.radius * 2}px`, height: `${event.radius * 2}px`,
                          opacity: event.duration < 300 ? (event.duration / 300) : 1, // Fade out
                      }} />
                  );
@@ -284,8 +261,8 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
             if (event.type === 'black_hole') {
                  return (
                      <div key={event.id} style={{ left: `${event.x}px`, top: `${event.y}px`, pointerEvents: 'none' }}>
-                         <div className="black-hole-core" style={{ width: `${(event.radius || 40) * 2}px`, height: `${(event.radius || 40) * 2}px` }} />
-                         <div className="black-hole-accretion-disk" style={{ width: `${(event.radius || 40) * 4}px`, height: `${(event.radius || 40) * 4}px` }} />
+                         <div className="black-hole-core" style={{ width: `${event.radius * 2}px`, height: `${event.radius * 2}px` }} />
+                         <div className="black-hole-accretion-disk" style={{ width: `${event.radius * 4}px`, height: `${event.radius * 4}px` }} />
                      </div>
                  );
             }
@@ -387,10 +364,10 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
             let warpingClassName = '';
             if (blackHoles.length > 0) {
                 for (const bh of blackHoles) {
-                    const dx = node.x - (bh.x || 0);
-                    const dy = node.y - (bh.y || 0);
+                    const dx = node.x - bh.x;
+                    const dy = node.y - bh.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-                    const influenceRadius = (bh.radius || 40) * 4;
+                    const influenceRadius = bh.radius * 4;
                     if (dist < influenceRadius) {
                         warpingClassName = 'node-warping';
                         break;
@@ -405,8 +382,6 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                 node.tunnelingState ? `tunnel-${node.tunnelingState.phase}` : ''
             ].join(' ');
             
-            const isHidden = isPlayer && gameState.projection.playerState === 'REFORMING';
-
             return (
                 <div
                     key={node.id}
@@ -414,7 +389,7 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                     onClick={(e) => {
                         e.stopPropagation();
                         if (isPlayer) {
-                           handlePlayerInteraction();
+                           handlePlayerInteraction(e);
                         } else {
                            handleNodeClick(node.id);
                         }
@@ -423,7 +398,6 @@ const Simulation: React.FC<SimulationProps> = ({ gameState, dispatch, dimensions
                     style={{
                         left: `${node.x}px`, top: `${node.y}px`,
                         width: `${node.radius * 2}px`, height: `${node.radius * 2}px`,
-                        opacity: isHidden ? 0 : 1,
                         cursor: isPlayer ? 'pointer' : 'pointer',
                     } as React.CSSProperties}
                 >

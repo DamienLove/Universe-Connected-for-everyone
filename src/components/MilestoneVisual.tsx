@@ -50,15 +50,15 @@ const getVisuals = (imageUrl?: string): { [key: string]: React.ReactNode } => ({
   ),
   planetary_accretion: (
     <div className="milestone-scene bg-black flex items-center justify-center">
-      {imageUrl ? (
-        <div className="flex items-center justify-center">
-            <img src={imageUrl} alt="Newly formed planet" className="w-[30vmin] h-[30vmin] object-cover rounded-full z-10 planet-formation-image" />
-        </div>
-      ) : (
-        <div className="proto-planet"></div>
-      )}
-      <div className="accretion-disk" style={{ transform: 'rotateX(75deg) scale(1.5)' }} />
-      <div className="accretion-disk" style={{ transform: 'rotateX(75deg) scale(1.1)', animationDelay: '-2s' }} />
+      <div className="relative w-[100vmin] h-[100vmin] flex items-center justify-center">
+        {imageUrl ? (
+          <img src={imageUrl} alt="Newly formed planet" className="w-[30vmin] h-[30vmin] object-cover rounded-full z-10 absolute" />
+        ) : (
+          <div className="proto-planet" />
+        )}
+        <div className="accretion-disk" style={{ transform: 'rotateX(75deg) scale(1.5)' }} />
+        <div className="accretion-disk" style={{ transform: 'rotateX(75deg) scale(1.1)', animationDelay: '-2s' }} />
+      </div>
       <h2 className="milestone-title">Worlds coalesce in the darkness.</h2>
     </div>
   ),

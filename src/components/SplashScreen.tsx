@@ -17,6 +17,8 @@ const SAVE_GAME_KEY = 'universe-connected-save';
 const SplashScreen: React.FC<SplashScreenProps> = ({ onStartGame, onLoadGame, dispatch, settings }) => {
   const [modal, setModal] = useState<'options' | 'credits' | 'audio' | null>(null);
   const [hasSaveGame, setHasSaveGame] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+
 
   useEffect(() => {
     // Check for a save game and start theme music
@@ -26,9 +28,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onStartGame, onLoadGame, di
     });
   }, []);
   
-  const handleStartGameWithMusic = () => {
+  const handleStartGameWithMusic = async () => {
+      setIsStarting(true);
       audioService.stopThemeMusic();
-      onStartGame();
+      await onStartGame();
+      // No need to set isStarting to false, as the component will unmount.
   };
   
   const handleLoadGameWithMusic = () => {
@@ -68,9 +72,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onStartGame, onLoadGame, di
               <button
                 style={{ animationDelay: '1s' }}
                 onClick={handleStartGameWithMusic}
+                disabled={isStarting}
                 className="w-full text-2xl font-bold py-3 px-8 rounded-lg splash-menu-button splash-menu-item"
               >
-                New Game
+                {isStarting ? 'Generating...' : 'New Game'}
               </button>
               <button
                 style={{ animationDelay: '1.2s' }}

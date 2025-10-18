@@ -4,7 +4,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // IMPORTANT: This must match your GitHub repo name exactly.
   base: '/Universe-Connected-for-everyone/',
   plugins: [
     react(),
@@ -36,5 +35,8 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'any maskable'
           }
-       ```
-to automate deployment or if you run into any other issues!
+        ]
+      }
+    })
+  ],
+});

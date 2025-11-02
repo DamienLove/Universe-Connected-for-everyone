@@ -1,9 +1,8 @@
 import React, { useReducer, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, QuantumPhage, CollectionEffect, CosmicEvent, AnomalyParticle, ConnectionParticle, WorldTransform, ProjectionState, CollectedItem } from '../types';
-import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, CROSSROADS_EVENTS, NODE_IMAGE_MAP } from './constants';
+import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, ProjectionState } from '../types';
+import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, NODE_IMAGE_MAP } from './constants';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { audioService } from '../services/AudioService';
-import { getGeminiLoreForNode } from '../services/geminiService';
 import { useWorldScale } from '../hooks/useWorldScale';
 
 import Simulation from './Simulation';
@@ -30,8 +29,6 @@ const DATA_GENERATION_RATE = 0.2;
 const STAR_ORB_SPAWN_CHANCE = 0.005;
 const PHAGE_SPAWN_CHANCE = 0.0001;
 const PHAGE_ATTRACTION = 0.01;
-const PHAGE_DRAIN_RATE = 0.5;
-const PLAYER_HUNT_RANGE = 150;
 const SUPERNOVA_WARNING_TICKS = 1800; // 30 seconds at 60fps
 const SUPERNOVA_EXPLOSION_TICKS = 120; // 2 seconds
 const ANOMALY_DURATION_TICKS = 1200; // 20 seconds
@@ -50,10 +47,6 @@ const REFORM_DURATION = 120; // 2 seconds
 
 const ORB_COLLECTION_LEEWAY = 10; // Extra radius for easier collection
 const AIM_ASSIST_ANGLE = 0.1; // Radians for snap
-
-const TUNNEL_CHANCE_PER_TICK = 0.0005;
-const TUNNEL_DISTANCE = 400;
-const TUNNEL_DURATION_TICKS = 60; // 1 second
 
 const SAVE_GAME_KEY = 'universe-connected-save';
 
@@ -160,7 +153,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'TICK': {
       if (state.isPaused) return state;
       let nextState = { ...state };
-      const { width, height, transform } = action.payload;
+      const { width, height } = action.payload;
       const worldRadius = (Math.min(width, height) * 1.5) / (state.zoomLevel + 1);
       
       let mutableNodes = nextState.nodes.map(n => ({...n}));
@@ -769,8 +762,8 @@ const App: React.FC = () => {
   const chapterInfo = useMemo(() => CHAPTERS[gameState.currentChapter], [gameState.currentChapter]);
   const karmaIndicatorPosition = useMemo(() => `${(gameState.karma + 100) / 2}%`, [gameState.karma]);
   
-  const chapterUpgrades = useMemo(() => UPGRADES.filter(u => u.chapter === gameState.currentChapter), [gameState.currentChapter]);
-  const unlockedChapterUpgrades = useMemo(() => chapterUpgrades.filter(u => gameState.unlockedUpgrades.has(u.id)).length, [chapterUpgrades, gameState.unlockedUpgrades]);
+  const chapterUpgrades = useMemo(() => UPGRADES.filter((u: Upgrade) => u.chapter === gameState.currentChapter), [gameState.currentChapter]);
+  const unlockedChapterUpgrades = useMemo(() => chapterUpgrades.filter((u: Upgrade) => gameState.unlockedUpgrades.has(u.id)).length, [chapterUpgrades, gameState.unlockedUpgrades]);
   const chapterProgress = useMemo(() => chapterUpgrades.length > 0 ? (unlockedChapterUpgrades / chapterUpgrades.length) * 100 : 0, [unlockedChapterUpgrades, chapterUpgrades.length]);
 
   if (!gameState.gameStarted) {
@@ -878,7 +871,7 @@ const App: React.FC = () => {
       
       <NodeInspector gameState={gameState} dispatch={dispatch} />
       
-      {isUpgradeModalOpen && <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} gameState={gameState} onPurchase={(upgrade, imageUrl) => dispatch({type: 'PURCHASE_UPGRADE', payload: {upgrade, imageUrl}})} />}
+      {isUpgradeModalOpen && <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} gameState={gameState} onPurchase={(upgrade: Upgrade, imageUrl: string) => dispatch({type: 'PURCHASE_UPGRADE', payload: {upgrade, imageUrl}})} />}
       {isSettingsModalOpen && <SettingsModal settings={gameState.settings} dispatch={dispatch} onClose={() => setSettingsModalOpen(false)} />}
       {gameState.tutorialStep !== -1 && <Tutorial step={gameState.tutorialStep} dispatch={dispatch} />}
       {gameState.activeMilestone && <MilestoneVisual milestoneId={gameState.activeMilestone.id} imageUrl={gameState.activeMilestone.imageUrl} onComplete={() => dispatch({type: 'MILESTONE_COMPLETE'})} />}

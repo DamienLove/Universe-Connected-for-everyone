@@ -4,13 +4,17 @@ import { GameNode, Chapter } from '../types';
 
 
 // The API key is now accessed via import.meta.env, which Vite replaces during the build process.
-const apiKey = import.meta.env.VITE_API_KEY as string;
+const apiKey = process.env.VITE_API_KEY as string;
 if (!apiKey) {
-  throw new Error("VITE_API_KEY environment variable not set");
+  // A simple console warning is better than throwing an error,
+  // allowing the game to run in a limited state if the key is missing.
+  console.warn("VITE_API_KEY environment variable not set. Gemini features will be unavailable.");
 }
+// Initialize with the key, even if it's undefined. The SDK will handle the error gracefully on call.
 const ai = new GoogleGenAI({ apiKey });
 
 export const getGeminiFlavorText = async (concept: string): Promise<string> => {
+  if (!apiKey) return '"The archives are silent on this matter..."';
   try {
     const prompt = `Create a short, poetic, and evocative flavor text for a concept in a cosmic evolution game. The concept is "${concept.replace(/_/g, ' ')}". The text should be a single sentence, enclosed in double quotes, and feel profound, like a line from a science fiction novel. For example, for "panspermia", you might write: "Life is a traveler. It journeys across the void on ships of ice and rock, seeking fertile ground to continue its endless story."`;
 
@@ -55,6 +59,7 @@ export const getGeminiFlavorText = async (concept: string): Promise<string> => {
 
 
 export const getGeminiLoreForNode = async (node: GameNode, chapter: Chapter): Promise<string> => {
+    if (!apiKey) return "The connection is weak... The future is clouded.";
     try {
         const nodeDescription = `${node.label} (${node.type.replace(/_/g, ' ')})`;
         const prompt = `You are the Universal Consciousness from Damien Nichols' book 'Universe Connected for Everyone'. A player is observing a cosmic entity: ${nodeDescription}. The universe is currently in the narrative chapter titled "${chapter.name}". Provide a short, profound, and slightly cryptic observation about this entity in the context of this chapter's themes. The response should be one or two sentences and not enclosed in quotes.`;
@@ -88,6 +93,7 @@ const MAX_RETRIES = 5;
 const INITIAL_BACKOFF_MS = 1000;
 
 export const generateNodeImage = async (prompt: string): Promise<string | null> => {
+    if (!apiKey) return null;
     let retries = 0;
     while (retries < MAX_RETRIES) {
         try {

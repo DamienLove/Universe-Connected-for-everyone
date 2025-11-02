@@ -3,6 +3,7 @@ import { GameState, GameAction, Upgrade, EnergyOrb, GameNode, ProjectionState } 
 import { UPGRADES, CHAPTERS, TUTORIAL_STEPS, NODE_IMAGE_MAP } from './constants';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { audioService } from '../services/AudioService';
+import { generateNodeImage, getGeminiLoreForNode } from '../services/geminiService';
 import { useWorldScale } from '../hooks/useWorldScale';
 
 import Simulation from './Simulation';
@@ -18,6 +19,7 @@ import NodeInspector from './NodeInspector';
 import ChapterTransition from './ChapterTransition';
 import LevelTransition from './LevelTransition';
 import SettingsModal from './SettingsModal';
+import { getNodeImagePrompt } from '../services/promptService';
 
 
 // Constants for game balance
@@ -39,11 +41,10 @@ const BLACK_HOLE_SPAWN_CHANCE = 0.00005;
 const BLACK_HOLE_DURATION_TICKS = 3600; // 1 minute
 const BLACK_HOLE_PULL_STRENGTH = 100;
 
-const AIM_ROTATION_SPEED = 0.01; // Radians per tick
+const AIM_ROTATION_SPEED = 0.05; // Radians per tick
 const POWER_OSCILLATION_SPEED = 1.5; // From 0 to 100
 const MAX_LAUNCH_POWER = 20;
 const PROJECTILE_FRICTION = 0.98;
-const REFORM_DURATION = 120; // 2 seconds
 
 const ORB_COLLECTION_LEEWAY = 10; // Extra radius for easier collection
 const AIM_ASSIST_ANGLE = 0.1; // Radians for snap
@@ -54,7 +55,6 @@ const initialProjectionState: ProjectionState = {
   playerState: 'IDLE',
   aimAngle: 0,
   power: 0,
-  reformTimer: 0,
 };
 
 const initialState: GameState = {
@@ -90,6 +90,7 @@ const initialState: GameState = {
       radius: 20,
       connections: [],
       hasLife: false,
+      imageUrl: NODE_IMAGE_MAP.player_consciousness[0], // Placeholder
     },
     {
       id: 'tutorial_planet',
@@ -102,6 +103,7 @@ const initialState: GameState = {
       radius: 15,
       connections: [],
       hasLife: false,
+      imageUrl: NODE_IMAGE_MAP.rocky_planet[0], // Placeholder
     },
   ],
   phages: [],
@@ -192,8 +194,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   const dist = Math.hypot(playerNode.x - node.x, playerNode.y - node.y);
                   if (dist < playerNode.radius + node.radius) {
                       playerNode.vx = 0; playerNode.vy = 0;
-                      nextState.projection.playerState = 'REFORMING';
-                      nextState.projection.reformTimer = REFORM_DURATION;
+                      nextState.projection.playerState = 'IDLE';
 
                       // Resource absorption based on node type
                       let energyGain = 0, knowledgeGain = 0, biomassGain = 0, unityGain = 0, complexityGain = 0;
@@ -218,17 +219,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               if (Math.hypot(playerNode.vx, playerNode.vy) < 0.1) {
                   playerNode.vx = 0;
                   playerNode.vy = 0;
-                  nextState.projection.playerState = 'REFORMING';
-                  nextState.projection.reformTimer = REFORM_DURATION;
+                  nextState.projection.playerState = 'IDLE';
               }
               break;
             }
-            case 'REFORMING':
-              nextState.projection.reformTimer--;
-              if (nextState.projection.reformTimer <= 0) {
-                nextState.projection.playerState = 'IDLE';
-              }
-              break;
           }
       }
 
@@ -657,6 +651,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
         return { ...state, tutorialStep: nextTutorialStep3, nodes: newNodes, projection: { ...state.projection, playerState: 'PROJECTING', power: 0 }};
     }
+     case 'UPDATE_NODE_IMAGE': {
+        const { nodeId, imageUrl } = action.payload;
+        return {
+            ...state,
+            nodes: state.nodes.map(node =>
+                node.id === nodeId ? { ...node, imageUrl } : node
+            ),
+        };
+    }
     case 'CHANGE_SETTING': {
         const { key, value } = action.payload;
         const newSettings = { ...state.settings, [key]: value };
@@ -745,10 +748,23 @@ const App: React.FC = () => {
 
   useGameLoop(dispatch, dimensions, gameState.isPaused, transform);
 
-  const startGame = useCallback(() => {
-    const playerImages = NODE_IMAGE_MAP['player_consciousness'];
-    const imageUrl = playerImages[0] || '';
-    dispatch({ type: 'START_GAME', payload: { playerImageUrl: imageUrl } });
+  const startGame = useCallback(async () => {
+    // Generate images for the player and the initial tutorial planet.
+    const playerImagePromise = generateNodeImage(getNodeImagePrompt('player_consciousness'));
+    const planetImagePromise = generateNodeImage(getNodeImagePrompt('rocky_planet'));
+    
+    const [playerImageUrl, planetImageUrl] = await Promise.all([playerImagePromise, planetImagePromise]);
+
+    dispatch({ type: 'START_GAME', payload: { playerImageUrl: playerImageUrl || NODE_IMAGE_MAP.player_consciousness[0] } });
+    
+    // Dispatch a second action to update the tutorial planet's image once the new state is processed.
+    // A small timeout ensures the START_GAME action has been reduced.
+    setTimeout(() => {
+      if (planetImageUrl) {
+        dispatch({ type: 'UPDATE_NODE_IMAGE', payload: { nodeId: 'tutorial_planet', imageUrl: planetImageUrl } });
+      }
+    }, 10);
+
   }, []);
 
   const loadGame = useCallback(() => {

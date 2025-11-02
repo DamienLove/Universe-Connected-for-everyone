@@ -107,7 +107,7 @@ export const generateNodeImage = async (prompt: string): Promise<string | null> 
                 },
             });
 
-            if (response.generatedImages && response.generatedImages.length > 0) {
+            if (response.generatedImages && response.generatedImages.length > 0 && response.generatedImages[0].image?.imageBytes) {
                 const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
                 return `data:image/png;base64,${base64ImageBytes}`;
             }

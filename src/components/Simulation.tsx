@@ -1,7 +1,3 @@
-import React from 'react';
-// Placeholder for Simulation component
-const Simulation: React.FC<any> = () => null;
-export default Simulation;
 import React, { useRef } from 'react';
 import { GameAction, GameState, WorldTransform } from '../types';
 import RadialMenu from './RadialMenu';

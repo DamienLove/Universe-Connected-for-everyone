@@ -4,7 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/Universe-Connected-for-everyone/',
+  // IMPORTANT: Replace with your repository name.
+  base: '/Universe-Connected-for-everyone-/',
   plugins: [
     react(),
     VitePWA({

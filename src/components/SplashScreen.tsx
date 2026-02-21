@@ -1,7 +1,3 @@
-import React from 'react';
-// Placeholder for SplashScreen component
-const SplashScreen: React.FC<any> = () => null;
-export default SplashScreen;
 import React, { useState, useEffect } from 'react';
 import { GameAction, GameState } from '../types';
 import SettingsModal from './SettingsModal';
